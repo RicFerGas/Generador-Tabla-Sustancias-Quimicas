@@ -1,6 +1,14 @@
 # SIGASH HDS Processor
 
-Este proyecto, desarrollado para SIGASH por **Ricardo Fernandez**, es una aplicación que permite procesar Hojas de Datos de Seguridad (HDS) en formato PDF y generar un archivo Excel y JSON con la información extraída. El procesamiento de los PDF utiliza un modelo de lenguaje (LLM) de OpenAI para extraer los datos relevantes.
+# SIGASH HDS Processor
+
+Este proyecto, desarrollado para SIGASH por **Ricardo Fernandez**, es una aplicación que permite procesar Hojas de Datos de Seguridad (HDS) en formato PDF y generar un archivo Excel y JSON con la información extraída. El procesamiento de los PDF utiliza un **Large Language Model (LLM)**, un modelo de lenguaje a gran escala potenciado por inteligencia artificial (IA).
+
+## ¿Qué es un LLM?
+
+Un **Large Language Model (LLM)** es un modelo de lenguaje entrenado utilizando grandes cantidades de datos textuales, capaz de entender y generar lenguaje natural con alto grado de precisión. Los LLMs, como el que se utiliza en esta aplicación, están impulsados por algoritmos avanzados de inteligencia artificial que pueden comprender el contexto, extraer información y generar respuestas complejas. 
+
+En este caso, la inteligencia artificial se utiliza para analizar automáticamente los contenidos de las Hojas de Datos de Seguridad (HDS) y extraer datos importantes, como los componentes químicos, porcentajes, advertencias, entre otros. Todo esto es hecho de manera automática, facilitando la tarea de análisis y procesamiento de datos, lo que hace que el sistema sea más eficiente y confiable para los usuarios de SIGASH.
 
 ## Requisitos del Sistema
 
@@ -17,7 +25,7 @@ El entorno virtual está excluido del repositorio. Se recomienda que cada usuari
 
 Si no tienes Git instalado o no sabes cómo usarlo, puedes descargar el proyecto directamente desde el siguiente enlace:
 
-1. Ve a la [página del repositorio del proyecto](https://github.com/sigash/hds-processor).
+1. Ve a la [página del repositorio del proyecto](https://github.com/RicFerGas/Generador-Tabla-Sustancias-Quimicas).
 2. Haz clic en el botón verde que dice **"Code"**.
 3. Selecciona **"Download ZIP"** para descargar el proyecto a tu computadora.
 4. Descomprime el archivo ZIP en una carpeta de tu elección.
