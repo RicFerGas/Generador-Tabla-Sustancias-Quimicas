@@ -3379,7 +3379,7 @@
  [],
  False,
  False,
- 1726328867,
+ 1726391313,
  [('runw',
    '/Users/ricardofernandezgasca/Library/CloudStorage/OneDrive-Personnel/Estudios/ESTUDIOS2024/NOM005Bitron24/proyecto/myenv/lib/python3.10/site-packages/PyInstaller/bootloader/Darwin-64bit/runw',
    'EXECUTABLE')],
