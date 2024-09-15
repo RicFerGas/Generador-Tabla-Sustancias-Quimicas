@@ -1,0 +1,8 @@
+openai
+PyQt5
+pandas
+pdfplumber
+pydantic
+pyinstaller
+python-dotenv
+openpyxl
