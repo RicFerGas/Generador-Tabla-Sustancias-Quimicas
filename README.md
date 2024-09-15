@@ -1,7 +1,5 @@
 # SIGASH HDS Processor
 
-# SIGASH HDS Processor
-
 Este proyecto, desarrollado para SIGASH por **Ricardo Fernandez**, es una aplicación que permite procesar Hojas de Datos de Seguridad (HDS) en formato PDF y generar un archivo Excel y JSON con la información extraída. El procesamiento de los PDF utiliza un **Large Language Model (LLM)**, un modelo de lenguaje a gran escala potenciado por inteligencia artificial (IA).
 
 ## ¿Qué es un LLM?
