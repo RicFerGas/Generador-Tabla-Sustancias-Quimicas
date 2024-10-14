@@ -1,3 +1,0 @@
-([('main',
-   '/Users/ricardofernandezgasca/Library/CloudStorage/OneDrive-Personnel/Estudios/ESTUDIOS2024/NOM005Bitron24/proyecto/dist/main',
-   'EXECUTABLE')],)

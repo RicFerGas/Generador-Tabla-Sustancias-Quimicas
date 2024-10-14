@@ -6,3 +6,7 @@ pydantic
 pyinstaller
 python-dotenv
 openpyxl
+pdf2image
+spacy
+pytesseract 
+pillow

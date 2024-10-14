@@ -7,17 +7,67 @@ from pydantic import ValidationError
 import pdfplumber
 import pandas as pd
 from dotenv import load_dotenv
+from pdf2image import convert_from_path
 from openpyxl import load_workbook
 from openpyxl.drawing.image import Image as ExcelImage
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment
+import pytesseract
+import spacy
 
-def extract_text_from_pdf(pdf_path):
+
+nlp = spacy.load('xx_ent_wiki_sm')
+
+def validate_extracted_text(text: str, threshold: float = 0.6) -> bool:
+    """
+    Validates the extracted text from a PDF based on the word count threshold.
+
+    Args:
+        text (str): The extracted text from the PDF.
+        threshold (float, optional): The threshold for the word count ratio. Defaults to 0.6.
+
+    Returns:
+        bool: True if the word count ratio exceeds the threshold, False otherwise.
+    """
+    # Tokenize and count valid words
+    doc = nlp(text)
+    word_count = sum(1 for token in doc if token.is_alpha)  # Only count alphabetic words
+    total_count = len(doc)
+    print(f"word count{word_count}, total count {total_count} rate {word_count / total_count}")
+
+    # If the percentage of valid words exceeds the threshold, consider it a good extract
+    if total_count == 0:
+        return False
+
+    return (word_count / total_count) >= threshold
+
+
+def extract_text_from_pdf(pdf_path: str) -> str:
+    """
+    Extracts text from a PDF file.
+    Args:
+        pdf_path (str): The path to the PDF file.
+    Returns:
+        str: The extracted text from the PDF file.
+    Raises:
+            None
+     """
     with pdfplumber.open(pdf_path) as pdf:
         text = ''
         for page in pdf.pages:
             text += page.extract_text()
-    return text
+
+    # Si el texto extraído pasa la validación, lo retornamos
+    if text and validate_extracted_text(text):
+        return text
+    else:
+        print("PDF sin texto, procesando como imagen")
+        # Si no, usamos OCR para extraer el texto
+        images = convert_from_path(pdf_path)
+        extracted_text = ""
+        for image in images:
+            extracted_text += pytesseract.image_to_string(image, lang='spa')
+        return extracted_text
 
 def prompt_generation(HDS):
     system_prompt = """

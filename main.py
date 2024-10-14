@@ -15,6 +15,14 @@ BASE_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
 # Ruta del archivo de configuración incluyendo ruta absoluta
 CONFIG_FILE = os.path.join(BASE_DIR, 'config.json')
 
+import subprocess
+
+def check_tesseract_installed():
+    try:
+        subprocess.run(["tesseract", "-v"], check=True)
+    except FileNotFoundError:
+        print("Tesseract no está instalado. Por favor instálalo usando 'brew install tesseract'.")
+
 # Función para guardar la configuración en un archivo JSON
 def save_config(api_key):
     config_data = {
@@ -210,7 +218,7 @@ class MainApp(QWidget):
 
         # Resetear la barra de progreso y etiqueta del archivo actual
         self.progress_bar.setValue(0)
-        self.label_current_file.setText('Archivo actual: Ninguno')
+        self.label_current_file.setText('Archivo actual:Inicializando el sistema')
 
 if __name__ == '__main__':
     import sys
@@ -218,6 +226,7 @@ if __name__ == '__main__':
 
     # Cargar la clave API de la configuración si ya existe
     api_key = load_config()
+    check_tesseract_installed()
 
     if not api_key:
         # Si no hay configuración previa, mostrar el menú de configuración
