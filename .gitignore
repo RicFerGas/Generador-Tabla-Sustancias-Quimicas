@@ -2,3 +2,7 @@
 .Dockerfile
 myenv/
 *.json
+venv/
+env/
+.env
+*.xlsx

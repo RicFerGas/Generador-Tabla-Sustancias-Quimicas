@@ -13,61 +13,119 @@ from openpyxl.drawing.image import Image as ExcelImage
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment
 import pytesseract
+import PyPDF2
 import spacy
-
+import fitz  # PyMuPDF
 
 nlp = spacy.load('xx_ent_wiki_sm')
+import pdfplumber
+from pdf2image import convert_from_path
+import pytesseract
 
+
+def is_valid_pdf(pdf_path: str) -> bool:
+    """
+    Validates if the PDF is structurally correct and can be opened.
+    """
+    if not os.path.isfile(pdf_path):
+        print(f"File does not exist: {pdf_path}")
+        return False
+
+    try:
+        # Check if it starts with %PDF-
+        with open(pdf_path, 'rb') as file:
+            header = file.read(4)
+            if header != b'%PDF':
+                print(f"File is not a valid PDF: {pdf_path}")
+                return False
+
+            # Attempt to open and read the PDF
+            pdf_reader = PyPDF2.PdfReader(file)
+            num_pages = len(pdf_reader.pages)
+
+            # Check if there are any pages
+            if num_pages == 0:
+                print(f"PDF has no pages: {pdf_path}")
+                return False
+            
+            # Check if any page has extractable text
+            text_found = False
+            for page in pdf_reader.pages:
+                if page.extract_text():
+                    text_found = True
+                    break
+
+            if not text_found:
+                print(f"No extractable text in PDF: {pdf_path}")
+                return False
+            
+            print(f"PDF is valid: {pdf_path} (pages: {num_pages})")
+            return True
+            
+    except Exception as e:
+        print(f"Invalid PDF {pdf_path}: {e}")
+        return False
 def validate_extracted_text(text: str, threshold: float = 0.6) -> bool:
     """
     Validates the extracted text from a PDF based on the word count threshold.
-
-    Args:
-        text (str): The extracted text from the PDF.
-        threshold (float, optional): The threshold for the word count ratio. Defaults to 0.6.
-
-    Returns:
-        bool: True if the word count ratio exceeds the threshold, False otherwise.
     """
-    # Tokenize and count valid words
-    doc = nlp(text)
-    word_count = sum(1 for token in doc if token.is_alpha)  # Only count alphabetic words
-    total_count = len(doc)
-    print(f"word count{word_count}, total count {total_count} rate {word_count / total_count}")
-
-    # If the percentage of valid words exceeds the threshold, consider it a good extract
-    if total_count == 0:
+    try:
+        doc = nlp(text)
+        word_count = sum(1 for token in doc if token.is_alpha)
+        total_count = len(doc)
+        print(f"word count: {word_count}, total count: {total_count}, rate: {word_count / total_count}")
+        if total_count == 0:
+            return False
+        return (word_count / total_count) >= threshold
+    except Exception as e:
+        print(f"Error in text validation: {e}")
         return False
-
-    return (word_count / total_count) >= threshold
-
 
 def extract_text_from_pdf(pdf_path: str) -> str:
     """
-    Extracts text from a PDF file.
+    Extracts text from a PDF file, first using pdfplumber and then OCR as a fallback.
+
     Args:
         pdf_path (str): The path to the PDF file.
+
     Returns:
         str: The extracted text from the PDF file.
-    Raises:
-            None
-     """
-    with pdfplumber.open(pdf_path) as pdf:
-        text = ''
-        for page in pdf.pages:
-            text += page.extract_text()
+    """
+    # Pre-check if the PDF is valid
+    if not is_valid_pdf(pdf_path):
+        print("PDF is corrupt or unreadable. Skipping.")
+        return "Invalid PDF"
+    
 
-    # Si el texto extraído pasa la validación, lo retornamos
+    # Try to extract text using pdfplumber
+    text = ""
+    try:
+        with fitz.open(pdf_path) as pdf:
+            for page_num in range(len(pdf)):
+                page = pdf.load_page(page_num)
+                text += page.get_text()
+    except Exception as e:
+        print(f"Error extracting text from {pdf_path} using PyMuPDF: {e}")
+        return "Text extraction failed."
+
+    # If text was successfully extracted and passes validation, return it
     if text and validate_extracted_text(text):
         return text
     else:
-        print("PDF sin texto, procesando como imagen")
-        # Si no, usamos OCR para extraer el texto
+        print("No valid text found, falling back to OCR.")
+
+    # If pdfplumber fails or extracted text is invalid, use OCR as fallback
+    try:
         images = convert_from_path(pdf_path)
         extracted_text = ""
         for image in images:
             extracted_text += pytesseract.image_to_string(image, lang='spa')
         return extracted_text
+    except Exception as e:
+        print(f"Error during OCR process: {e}")
+        return "OCR extraction failed."
+
+
 
 def prompt_generation(HDS):
     system_prompt = """
@@ -94,6 +152,7 @@ def get_completion_openai(system_prompt, user_prompt, client,model="gpt-4o-2024-
 
 # Obtenemos el objeto parseado directamente
     hds_data = completion.choices[0].message.parsed
+    # print(hds_data.model_dump())
     return hds_data
 
 def flatten_hds_data(hds_dict):
