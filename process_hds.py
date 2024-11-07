@@ -2,9 +2,6 @@
 import os
 import json
 import openai
-from schemas import HDSData
-from pydantic import ValidationError
-import pdfplumber
 import pandas as pd
 from dotenv import load_dotenv
 from pdf2image import convert_from_path
@@ -16,11 +13,10 @@ import pytesseract
 import PyPDF2
 import spacy
 import fitz  # PyMuPDF
+from schemas import HDSData
 
 nlp = spacy.load('xx_ent_wiki_sm')
-import pdfplumber
-from pdf2image import convert_from_path
-import pytesseract
+
 
 
 def is_valid_pdf(pdf_path: str) -> bool:
@@ -83,7 +79,7 @@ def validate_extracted_text(text: str, threshold: float = 0.6) -> bool:
 
 def extract_text_from_pdf(pdf_path: str) -> str:
     """
-    Extracts text from a PDF file, first using pdfplumber and then OCR as a fallback.
+    Extracts text from a PDF file, first using PyMuPDF and then OCR as a fallback.
 
     Args:
         pdf_path (str): The path to the PDF file.
@@ -91,14 +87,9 @@ def extract_text_from_pdf(pdf_path: str) -> str:
     Returns:
         str: The extracted text from the PDF file.
     """
-    # Pre-check if the PDF is valid
-    if not is_valid_pdf(pdf_path):
-        print("PDF is corrupt or unreadable. Skipping.")
-        return "Invalid PDF"
-    
-
-    # Try to extract text using pdfplumber
     text = ""
+
+    # Intentar extraer texto usando PyMuPDF
     try:
         with fitz.open(pdf_path) as pdf:
             for page_num in range(len(pdf)):
@@ -106,15 +97,15 @@ def extract_text_from_pdf(pdf_path: str) -> str:
                 text += page.get_text()
     except Exception as e:
         print(f"Error extracting text from {pdf_path} using PyMuPDF: {e}")
-        return "Text extraction failed."
+        text = ""
 
-    # If text was successfully extracted and passes validation, return it
+    # Si se extrajo texto y pasa la validación, devolverlo
     if text and validate_extracted_text(text):
         return text
     else:
-        print("No valid text found, falling back to OCR.")
+        print("No valid text found or extraction failed, proceeding to OCR.")
 
-    # If pdfplumber fails or extracted text is invalid, use OCR as fallback
+    # Intentar extraer texto usando OCR
     try:
         images = convert_from_path(pdf_path)
         extracted_text = ""
@@ -127,15 +118,35 @@ def extract_text_from_pdf(pdf_path: str) -> str:
 
 
 
-def prompt_generation(HDS):
+
+def prompt_generation(hds: str) -> tuple:
+    """
+    Generates the system and user prompts for the OpenAI API based on the HDS text."""
     system_prompt = """
     Eres un asistente que extrae información de Hojas de Datos de Seguridad (HDS) para estudios de riesgo por sustancias químicas. 
+    La información extraida debe estar siempre ** EN ESPAÑOL ** y seguir el formato especificado.
     Extrae la información relevante de la HDS proporcionada y devuélvela siguiendo el formato especificado, para el caso de las propiedades numericas,
     no pongas 0 si no ecnuentras la propiedad, el valor default es none."""
-    user_prompt = f"La HDS es la siguiente:\n\n{HDS}"
+    user_prompt = f"La HDS es la siguiente:\n\n{hds}"
     return system_prompt, user_prompt
 
-def get_completion_openai(system_prompt, user_prompt, client,model="gpt-4o-2024-08-06", max_tokens=2500):
+def get_completion_openai(system_prompt: str, user_prompt: str,
+                          client ,model:str ="gpt-4o-2024-08-06",
+                          max_tokens:int=4000):
+    """
+    Gets the completion from the OpenAI API using the system and user prompts.
+    
+    Args:
+        system_prompt (str): The system prompt to provide context.
+        user_prompt (str): The user prompt to generate the completion.
+        client (openai.OpenAI): The OpenAI API client.
+        model (str): The model to use for the completion.
+        max_tokens (int): The maximum number of tokens to generate.
+
+    Returns:
+        HDSData: The parsed HDS data object from the completion.
+
+    """
     
     completion = client.beta.chat.completions.parse(
     model=model,
@@ -155,7 +166,17 @@ def get_completion_openai(system_prompt, user_prompt, client,model="gpt-4o-2024-
     # print(hds_data.model_dump())
     return hds_data
 
-def flatten_hds_data(hds_dict):
+def flatten_hds_data(hds_dict:dict) -> list:
+    """
+    Flattens the HDS data dictionary into a list of dictionaries for Excel export.
+    
+    Args:
+        hds_dict (dict): The HDS data dictionary.
+
+    Returns:
+        list: A list of dictionaries with flattened data for each substance.
+    
+    """
     sustancias_flat = []
 
     # Información común para todas las filas de la sustancia
@@ -167,11 +188,22 @@ def flatten_hds_data(hds_dict):
         'Palabra de Advertencia': hds_dict.get('palabra_advertencia'),
         'Indicaciones de toxicología': hds_dict.get('indicaciones_toxicologia'),
         'Pictogramas': ', '.join(hds_dict.get('pictogramas', [])),
+        'Olor': hds_dict.get('olor'),
+        'Color': hds_dict.get('color'),
+        'Propiedades Explosivas': hds_dict.get('propiedades_explosivas'),
+        'Propiedades Comburentes': hds_dict.get('propiedades_comburentes'),
+        'Tamaño de Partícula': hds_dict.get('tamano_particula'),
         # Agrega aquí otras propiedades no anidadas o que no sean listas
     }
 
     # Desanidar propiedades como Temperatura de ebullición, Punto de inflamación, etc.
-    propiedades = ['temperatura_ebullicion', 'punto_congelacion', 'densidad', 'punto_inflamacion', 'solubilidad_agua']
+    propiedades = ['temperatura_ebullicion', 
+                   'punto_congelacion', 'densidad', 
+                   'punto_inflamacion', 'solubilidad_agua',
+                    'velocidad_evaporacion',  # Nueva propiedad
+                    'presion_vapor'           # Nueva propiedad
+                   
+                   ]
     for prop in propiedades:
         propiedad = hds_dict.get(prop)
         if propiedad:
@@ -216,7 +248,17 @@ def flatten_hds_data(hds_dict):
     return sustancias_flat
 
 
-def export_to_excel(data, output_file="output.xlsx"):
+def export_to_excel(data:list, output_file:str ="output.xlsx")->None:
+    """
+    Exporta los datos de las sustancias a un archivo Excel con celdas combinadas y alineadas.
+
+    Args:
+        data (list): La lista de datos de las sustancias.
+        output_file (str): La ruta del archivo de salida Excel.
+
+
+    """
+
     # Crear DataFrame de pandas
     df = pd.DataFrame(data)
 
@@ -233,19 +275,30 @@ def export_to_excel(data, output_file="output.xlsx"):
         'Pictogramas',                      # 9. Pictogramas
         'Identificaciones de peligro H',    # 10. Identificaciones de peligro H
         'Consejos de Prudencia P',          # 11. Consejos de prudencia P
-        'temperatura_ebullicion (Valor)',   # 12. Propiedades: temperatura de ebullición
-        'temperatura_ebullicion (Unidades)',
-        'punto_congelacion (Valor)',        # 13. Propiedades: punto de congelación
-        'punto_congelacion (Unidades)',
-        'densidad (Valor)',                 # 14. Propiedades: densidad
-        'densidad (Unidades)',
-        'punto_inflamacion (Valor)',        # 15. Propiedades: punto de inflamación
-        'punto_inflamacion (Unidades)',
-        'solubilidad_agua (Valor)',         # 16. Propiedades: solubilidad en agua
-        'solubilidad_agua (Unidades)',
-        'Límite inferior de inflamabilidad', # 17. Límites de inflamabilidad
-        'Límite superior de inflamabilidad'
-    ]
+        'Olor',                             # 12. Olor
+        'Color',                            # 13. Color
+        'pH de la sustancia',               # 14. pH
+        'temperatura_ebullicion (Valor)',   # 15. Temperatura de ebullición (Valor)
+        'temperatura_ebullicion (Unidades)',# 16. Temperatura de ebullición (Unidades)
+        'punto_congelacion (Valor)',        # 17. Punto de congelación (Valor)
+        'punto_congelacion (Unidades)',     # 18. Punto de congelación (Unidades)
+        'densidad (Valor)',                 # 19. Densidad (Valor)
+        'densidad (Unidades)',              # 20. Densidad (Unidades)
+        'punto_inflamacion (Valor)',        # 21. Punto de inflamación (Valor)
+        'punto_inflamacion (Unidades)',     # 22. Punto de inflamación (Unidades)
+        'velocidad_evaporacion (Valor)',    # 23. Velocidad de evaporación (Valor)
+        'velocidad_evaporacion (Unidades)', # 24. Velocidad de evaporación (Unidades)
+        'presion_vapor (Valor)',            # 25. Presión de vapor (Valor)
+        'presion_vapor (Unidades)',         # 26. Presión de vapor (Unidades)
+        'solubilidad_agua (Valor)',         # 27. Solubilidad en agua (Valor)
+        'solubilidad_agua (Unidades)',      # 28. Solubilidad en agua (Unidades)
+        'Propiedades Explosivas',           # 29. Propiedades Explosivas
+        'Propiedades Comburentes',          # 30. Propiedades Comburentes
+        'Tamaño de Partícula',              # 31. Tamaño de Partícula
+        'Límite inferior de inflamabilidad',# 32. Límite inferior de inflamabilidad
+        'Límite superior de inflamabilidad' # 33. Límite superior de inflamabilidad
+                ]
+    
 
     # Reordenar las columnas del DataFrame
     df = df[column_order]
@@ -260,13 +313,36 @@ def export_to_excel(data, output_file="output.xlsx"):
 
     # Combinación de celdas para las columnas especificadas solo si la sustancia es la misma
     merge_columns = [
-        'Archivo', 'Nombre de la Sustancia Química', 'Idioma de la HDS', 'Palabra de Advertencia',
-        'Indicaciones de toxicología', 'Pictogramas', 'Identificaciones de peligro H', 'Consejos de Prudencia P',
-        'temperatura_ebullicion (Valor)', 'temperatura_ebullicion (Unidades)', 'punto_congelacion (Valor)',
-        'punto_congelacion (Unidades)', 'densidad (Valor)', 'densidad (Unidades)', 'punto_inflamacion (Valor)',
-        'punto_inflamacion (Unidades)', 'solubilidad_agua (Valor)', 'solubilidad_agua (Unidades)',
-        'Límite inferior de inflamabilidad', 'Límite superior de inflamabilidad'
-    ]
+    'Archivo',
+    'Nombre de la Sustancia Química',
+    'Idioma de la HDS',
+    'Palabra de Advertencia',
+    'Indicaciones de toxicología',
+    'Pictogramas',
+    'Identificaciones de peligro H',
+    'Consejos de Prudencia P',
+    'Olor',
+    'Color',
+    'pH de la sustancia',
+    'temperatura_ebullicion (Valor)',
+    'temperatura_ebullicion (Unidades)',
+    'punto_congelacion (Valor)',
+    'punto_congelacion (Unidades)',
+    'densidad (Valor)',
+    'densidad (Unidades)',
+    'punto_inflamacion (Valor)',
+    'punto_inflamacion (Unidades)',
+    'velocidad_evaporacion (Valor)',
+    'velocidad_evaporacion (Unidades)',
+    'presion_vapor (Valor)',
+    'presion_vapor (Unidades)',
+    'solubilidad_agua (Valor)',
+    'solubilidad_agua (Unidades)',
+    'Propiedades Explosivas',
+    'Propiedades Comburentes',
+    'Tamaño de Partícula',
+    'Límite inferior de inflamabilidad',
+    'Límite superior de inflamabilidad']
 
     # Combinación de celdas para las columnas especificadas solo si la sustancia es la misma
     current_values = {col: None for col in merge_columns}
@@ -310,30 +386,41 @@ def export_to_excel(data, output_file="output.xlsx"):
 
     # Fijar el ancho de las columnas según lo que esperas ver
     fixed_column_widths = {
-        'A': 10,  # Archivo
-        'B': 12,  # Nombre de la Sustancia Química
-        'C': 5,  # Idioma de la HDS
-        'D': 12,  # Nombre del Componente
-        'E': 6,  # Número CAS del Componente
-        'F': 6,  # Porcentaje del Componente
-        'G': 10,  # Palabra de Advertencia
-        'H': 25,  # Indicaciones de toxicología
-        'I': 20,  # Pictogramas
-        'J': 20,  # Identificaciones de peligro H
-        'K': 20,  # Consejos de Prudencia P
-        'L': 8,  # Temperatura de ebullición (Valor)
-        'M': 8,  # Temperatura de ebullición (Unidades)
-        'N': 8,  # Punto de congelación (Valor)
-        'O': 8,  # Punto de congelación (Unidades)
-        'P': 8,  # Densidad (Valor)
-        'Q': 8,  # Densidad (Unidades)
-        'R': 8,  # Punto de inflamación (Valor)
-        'S': 8,  # Punto de inflamación (Unidades)
-        'T': 8,  # Solubilidad en agua (Valor)
-        'U': 8,  # Solubilidad en agua (Unidades)
-        'V': 8,  # Límite inferior de inflamabilidad
-        'W': 8,  # Límite superior de inflamabilidad
-    }
+    'A': 10,   # Archivo
+    'B': 20,   # Nombre de la Sustancia Química
+    'C': 5,    # Idioma de la HDS
+    'D': 15,   # Nombre del Componente
+    'E': 12,   # Número CAS del Componente
+    'F': 10,   # Porcentaje del Componente
+    'G': 12,   # Palabra de Advertencia
+    'H': 25,   # Indicaciones de toxicología
+    'I': 20,   # Pictogramas
+    'J': 30,   # Identificaciones de peligro H
+    'K': 30,   # Consejos de Prudencia P
+    'L': 15,   # Olor
+    'M': 15,   # Color
+    'N': 8,    # pH de la sustancia
+    'O': 12,   # temperatura_ebullicion (Valor)
+    'P': 12,   # temperatura_ebullicion (Unidades)
+    'Q': 12,   # punto_congelacion (Valor)
+    'R': 12,   # punto_congelacion (Unidades)
+    'S': 12,   # densidad (Valor)
+    'T': 12,   # densidad (Unidades)
+    'U': 12,   # punto_inflamacion (Valor)
+    'V': 12,   # punto_inflamacion (Unidades)
+    'W': 12,   # velocidad_evaporacion (Valor)
+    'X': 12,   # velocidad_evaporacion (Unidades)
+    'Y': 12,   # presion_vapor (Valor)
+    'Z': 12,   # presion_vapor (Unidades)
+    'AA': 12,  # solubilidad_agua (Valor)
+    'AB': 12,  # solubilidad_agua (Unidades)
+    'AC': 20,  # Propiedades Explosivas
+    'AD': 20,  # Propiedades Comburentes
+    'AE': 15,  # Tamaño de Partícula
+    'AF': 12,  # Límite inferior de inflamabilidad
+    'AG': 12   # Límite superior de inflamabilidad
+        }
+
 
     for col, width in fixed_column_widths.items():
         ws.column_dimensions[col].width = width
@@ -351,7 +438,21 @@ def export_to_excel(data, output_file="output.xlsx"):
     wb.save(output_file)
 
 
-def process_hds_folder(folder_path, project_name, client, excel_output, json_output, progress_callback=None):
+def process_hds_folder(folder_path:str, project_name:str, client, excel_output:str, json_output:str, progress_callback=None):
+    """
+    Procesa una carpeta de archivos PDF de Hojas de Datos de Seguridad (HDS) y genera un archivo Excel con los datos extraídos.
+
+    Args:
+        folder_path (str): La ruta de la carpeta que contiene los archivos PDF.
+        project_name (str): El nombre del proyecto o carpeta.
+        client (openai.OpenAI): El cliente de OpenAI API.
+        excel_output (str): La ruta del archivo Excel de salida.
+        json_output (str): La ruta del archivo JSON de salida.
+        progress_callback (function): Una función de callback para informar del progreso.
+
+    Returns:
+        tuple: Una tupla con una lista de errores y una lista de todas las sustancias procesadas.
+    """
     all_sustancias = []
     errores = []
     sustancias_data = []  # Lista para almacenar los datos procesados para Excel
@@ -399,9 +500,9 @@ def process_hds_folder(folder_path, project_name, client, excel_output, json_out
     print(f"Proceso completado. Los archivos {json_output} y {excel_output} han sido generados.")
     return errores, all_sustancias
 
-
-# load_dotenv()
-# openai.api_key = os.getenv("OPENAI_API_KEY")
-# example_path="ejemplo/"
-# client = openai.OpenAI()
-# process_hds_folder(example_path, "Ejemplo",client)
+if __name__ == "__main__":
+    load_dotenv()
+    openai.api_key = os.getenv("OPENAI_API_KEY")
+    example_path="ejemplo/"
+    client = openai.OpenAI()
+    process_hds_folder(example_path, "Ejemplo",client,'ejemplo/prueba.xlsx','ejemplo/prueba.json')
