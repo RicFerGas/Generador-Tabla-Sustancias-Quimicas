@@ -6,13 +6,13 @@ import pandas as pd
 from dotenv import load_dotenv
 from pdf2image import convert_from_path
 from openpyxl import load_workbook
-from openpyxl.drawing.image import Image as ExcelImage
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment
 import pytesseract
 import PyPDF2
 import spacy
 import fitz  # PyMuPDF
+from rapidfuzz import fuzz, process
 from schemas import HDSData
 
 nlp = spacy.load('xx_ent_wiki_sm')
@@ -166,16 +166,18 @@ def get_completion_openai(system_prompt: str, user_prompt: str,
     # print(hds_data.model_dump())
     return hds_data
 
-def flatten_hds_data(hds_dict:dict) -> list:
+
+def flatten_hds_data(hds_dict: dict, retc_data: dict, gei_data: dict) -> list:
     """
-    Flattens the HDS data dictionary into a list of dictionaries for Excel export.
-    
+    Flattens the HDS data into a list of dictionaries for Excel export.
+
     Args:
         hds_dict (dict): The HDS data dictionary.
+        retc_data (dict): The RETC data dictionary.
+        gei_data (dict): The GEI data dictionary.
 
     Returns:
         list: A list of dictionaries with flattened data for each substance.
-    
     """
     sustancias_flat = []
 
@@ -184,6 +186,9 @@ def flatten_hds_data(hds_dict:dict) -> list:
         'Archivo': hds_dict.get('Archivo'),
         'Nombre de la Sustancia Química': hds_dict.get('nombre_sustancia_quimica'),
         'Idioma de la HDS': hds_dict.get('idioma'),
+        'Estado Físico': hds_dict.get('estado_fisico'),
+        'Sujeta a RETC': hds_dict.get('sujeta_retc'),
+        'Sujeta a GEI': hds_dict.get('sujeta_gei'),
         'pH de la sustancia': hds_dict.get('ph'),
         'Palabra de Advertencia': hds_dict.get('palabra_advertencia'),
         'Indicaciones de toxicología': hds_dict.get('indicaciones_toxicologia'),
@@ -193,17 +198,18 @@ def flatten_hds_data(hds_dict:dict) -> list:
         'Propiedades Explosivas': hds_dict.get('propiedades_explosivas'),
         'Propiedades Comburentes': hds_dict.get('propiedades_comburentes'),
         'Tamaño de Partícula': hds_dict.get('tamano_particula'),
-        # Agrega aquí otras propiedades no anidadas o que no sean listas
     }
 
-    # Desanidar propiedades como Temperatura de ebullición, Punto de inflamación, etc.
-    propiedades = ['temperatura_ebullicion', 
-                   'punto_congelacion', 'densidad', 
-                   'punto_inflamacion', 'solubilidad_agua',
-                    'velocidad_evaporacion',  # Nueva propiedad
-                    'presion_vapor'           # Nueva propiedad
-                   
-                   ]
+    # Desanidar propiedades numéricas
+    propiedades = [
+        'temperatura_ebullicion',
+        'punto_congelacion',
+        'densidad',
+        'punto_inflamacion',
+        'solubilidad_agua',
+        'velocidad_evaporacion',
+        'presion_vapor'
+    ]
     for prop in propiedades:
         propiedad = hds_dict.get(prop)
         if propiedad:
@@ -213,7 +219,7 @@ def flatten_hds_data(hds_dict:dict) -> list:
             common_info[f'{prop} (Valor)'] = None
             common_info[f'{prop} (Unidades)'] = None
 
-    # Limites de inflamabilidad
+    # Límites de inflamabilidad
     common_info['Límite inferior de inflamabilidad'] = hds_dict.get('limite_inf_inflamabilidad')
     common_info['Límite superior de inflamabilidad'] = hds_dict.get('limite_sup_inflamabilidad')
 
@@ -225,18 +231,87 @@ def flatten_hds_data(hds_dict:dict) -> list:
             row['Nombre del Componente'] = componente.get('nombre')
             row['Número CAS del Componente'] = componente.get('numero_cas')
             row['Porcentaje del Componente'] = componente.get('porcentaje')
+
+            # Verificar si el número CAS está en la tabla RETC
+            cas_number = componente.get('numero_cas')
+            nombre_componente = componente.get('nombre')
+
+            # Buscar en RETC por número CAS
+            retc_entry = retc_data.get(cas_number)
+
+            # Si no se encuentra por CAS, intentar buscar por nombre usando coincidencia difusa
+            if not retc_entry and nombre_componente:
+                # Crear una lista de nombres comunes de RETC
+                retc_nombres = [entry['componente_retc'] for entry in retc_data.values()]
+                # Realizar coincidencia difusa
+                match = process.extractOne(nombre_componente, 
+                                           retc_nombres, 
+                                           scorer=fuzz.token_sort_ratio)
+                if match and match[1] >= 80:  # Umbral de similitud del 80%
+                    # Obtener la entrada correspondiente
+                    for entry in retc_data.values():
+                        if entry['componente_retc'] == match[0]:
+                            retc_entry = entry
+                            break
+
+            # Asignar datos de RETC si se encontró una coincidencia
+            if retc_entry:
+                row['Componente RETC'] = retc_entry.get('componente_retc')
+                row['MPU'] = retc_entry.get('mpu')
+                row['Emision Transferencia'] = retc_entry.get('emision_transferencia')
+            else:
+                row['Componente RETC'] = None
+                row['MPU'] = None
+                row['Emision Transferencia'] = None
+
+            # Hacer lo mismo para GEI
+            # Buscar en GEI por número CAS
+            gei_entry = gei_data.get(cas_number)
+
+            # Si no se encuentra por CAS, intentar buscar por nombre usando coincidencia difusa
+            if not gei_entry and nombre_componente:
+                gei_nombres = [entry['nombre_comun'] for entry in gei_data.values()]
+                match = process.extractOne(nombre_componente,
+                                            gei_nombres,
+                                            scorer=fuzz.token_sort_ratio)
+                if match and match[1] >= 90:
+                    print(f"GEI match between {nombre_componente} and {match[0]}: {match[1]}")
+                    for entry in gei_data.values():
+                        if entry['nombre_comun'] == match[0]:
+                            gei_entry = entry
+                            break
+
+            if gei_entry:
+                row['Componente GEI'] = gei_entry.get('nombre_comun')
+                row['Potencial de Calentamiento Global'] = gei_entry.get('PCG')
+            else:
+                row['Componente GEI'] = None
+                row['Potencial de Calentamiento Global'] = None
+
             sustancias_flat.append(row)
     else:
         # Si no hay componentes, agregar la sustancia sin detalles de componentes
-        sustancias_flat.append(common_info)
+        row = common_info.copy()
+        # Agregar campos vacíos
+        row['Nombre del Componente'] = None
+        row['Número CAS del Componente'] = None
+        row['Porcentaje del Componente'] = None
+        row['Componente RETC'] = None
+        row['MPU'] = None
+        row['Emision Transferencia'] = None
+        row['Componente GEI'] = None
+        row['Potencial de Calentamiento Global'] = None
+        sustancias_flat.append(row)
 
     # Manejar Indicaciones de peligro H y Consejos de Prudencia P
     indicaciones_h = hds_dict.get('identificaciones_peligro_h', [])
     consejos_p = hds_dict.get('consejos_prudencia_p', [])
 
     # Concatenar códigos y descripciones
-    common_info['Identificaciones de peligro H'] = '; '.join([f"{i['codigo']}: {i['descripcion']}" for i in indicaciones_h])
-    common_info['Consejos de Prudencia P'] = '; '.join([f"{i['codigo']}: {i['descripcion']}" for i in consejos_p])
+    common_info['Identificaciones de peligro H'] = '; '.join(
+        [f"{i['codigo']}: {i['descripcion']}" for i in indicaciones_h])
+    common_info['Consejos de Prudencia P'] = '; '.join(
+        [f"{i['codigo']}: {i['descripcion']}" for i in consejos_p])
 
     # Actualizar las filas existentes con las indicaciones
     for row in sustancias_flat:
@@ -246,6 +321,7 @@ def flatten_hds_data(hds_dict:dict) -> list:
         })
 
     return sustancias_flat
+
 
 
 def export_to_excel(data:list, output_file:str ="output.xlsx")->None:
@@ -262,98 +338,109 @@ def export_to_excel(data:list, output_file:str ="output.xlsx")->None:
     # Crear DataFrame de pandas
     df = pd.DataFrame(data)
 
-    # Definir el orden deseado de las columnas
+    # Define the desired order of columns
     column_order = [
-        'Archivo',                         # 1. Nombre del archivo
-        'Nombre de la Sustancia Química',   # 2. Nombre de la sustancia
-        'Idioma de la HDS',                 # 3. Idioma
-        'Nombre del Componente',            # 4. Componente
-        'Número CAS del Componente',        # 5. CAS del componente
-        'Porcentaje del Componente',        # 6. Porcentaje
-        'Palabra de Advertencia',           # 7. Palabra de advertencia
-        'Indicaciones de toxicología',      # 8. Indicaciones de toxicología
-        'Pictogramas',                      # 9. Pictogramas
-        'Identificaciones de peligro H',    # 10. Identificaciones de peligro H
-        'Consejos de Prudencia P',          # 11. Consejos de prudencia P
-        'Olor',                             # 12. Olor
-        'Color',                            # 13. Color
-        'pH de la sustancia',               # 14. pH
-        'temperatura_ebullicion (Valor)',   # 15. Temperatura de ebullición (Valor)
-        'temperatura_ebullicion (Unidades)',# 16. Temperatura de ebullición (Unidades)
-        'punto_congelacion (Valor)',        # 17. Punto de congelación (Valor)
-        'punto_congelacion (Unidades)',     # 18. Punto de congelación (Unidades)
-        'densidad (Valor)',                 # 19. Densidad (Valor)
-        'densidad (Unidades)',              # 20. Densidad (Unidades)
-        'punto_inflamacion (Valor)',        # 21. Punto de inflamación (Valor)
-        'punto_inflamacion (Unidades)',     # 22. Punto de inflamación (Unidades)
-        'velocidad_evaporacion (Valor)',    # 23. Velocidad de evaporación (Valor)
-        'velocidad_evaporacion (Unidades)', # 24. Velocidad de evaporación (Unidades)
-        'presion_vapor (Valor)',            # 25. Presión de vapor (Valor)
-        'presion_vapor (Unidades)',         # 26. Presión de vapor (Unidades)
-        'solubilidad_agua (Valor)',         # 27. Solubilidad en agua (Valor)
-        'solubilidad_agua (Unidades)',      # 28. Solubilidad en agua (Unidades)
-        'Propiedades Explosivas',           # 29. Propiedades Explosivas
-        'Propiedades Comburentes',          # 30. Propiedades Comburentes
-        'Tamaño de Partícula',              # 31. Tamaño de Partícula
-        'Límite inferior de inflamabilidad',# 32. Límite inferior de inflamabilidad
-        'Límite superior de inflamabilidad' # 33. Límite superior de inflamabilidad
-                ]
-    
+        'Archivo',                         # 1. File name
+        'Nombre de la Sustancia Química',   # 2. Substance name
+        'Idioma de la HDS',                 # 3. Language
+        'Nombre del Componente',            # 4. Component name
+        'Sujeta a GEI',                     # 5. GEI component
+        'Sujeta a RETC',                    # 6. RETC component
+        'Número CAS del Componente',        # 7. Component CAS number
+        'Porcentaje del Componente',        # 8. Component percentage
+        'Componente GEI',                   # 9. GEI component
+        'Potencial de Calentamiento Global',# 10. Global Warming Potential
+        'Componente RETC',                  # 11. RETC component
+        'MPU',                              # 12. MPU
+        'Emision Transferencia',            # 13. Emission transfer
+        'Palabra de Advertencia',           # 14. Warning word
+        'Indicaciones de toxicología',      # 15. Toxicology indications
+        'Pictogramas',                      # 16. Pictograms
+        'Estado Físico',                    # 17. Physical state
+        'Identificaciones de peligro H',    # 17. Hazard identifications H
+        'Consejos de Prudencia P',          # 18. Precautionary statements P
+        'Olor',                             # 19. Odor
+        'Color',                            # 20. Color
+        'pH de la sustancia',               # 21. pH
+        'temperatura_ebullicion (Valor)',   # 22. Boiling temperature (Value)
+        'temperatura_ebullicion (Unidades)',# 23. Boiling temperature (Units)
+        'punto_congelacion (Valor)',        # 24. Freezing point (Value)
+        'punto_congelacion (Unidades)',     # 25. Freezing point (Units)
+        'densidad (Valor)',                 # 26. Density (Value)
+        'densidad (Unidades)',              # 27. Density (Units)
+        'punto_inflamacion (Valor)',        # 28. Flash point (Value)
+        'punto_inflamacion (Unidades)',     # 29. Flash point (Units)
+        'velocidad_evaporacion (Valor)',    # 30. Evaporation rate (Value)
+        'velocidad_evaporacion (Unidades)', # 31. Evaporation rate (Units)
+        'presion_vapor (Valor)',            # 32. Vapor pressure (Value)
+        'presion_vapor (Unidades)',         # 33. Vapor pressure (Units)
+        'solubilidad_agua (Valor)',         # 34. Water solubility (Value)
+        'solubilidad_agua (Unidades)',      # 35. Water solubility (Units)
+        'Propiedades Explosivas',           # 36. Explosive properties
+        'Propiedades Comburentes',          # 37. Oxidizing properties
+        'Tamaño de Partícula',              # 38. Particle size
+        'Límite inferior de inflamabilidad',# 39. Lower flammability limit
+        'Límite superior de inflamabilidad'# 40. Upper flammability limit        
+    ]
 
-    # Reordenar las columnas del DataFrame
+    # Reorder the DataFrame columns
     df = df[column_order]
 
-    # Guardar el DataFrame a un archivo Excel temporal
+    # Save the DataFrame to a temporary Excel file
     temp_file = "temp_output.xlsx"
     df.to_excel(temp_file, index=False)
 
-    # Cargar el archivo Excel con openpyxl para personalizarlo
+    # Load the Excel file with openpyxl for customization
     wb = load_workbook(temp_file)
     ws = wb.active
 
-    # Combinación de celdas para las columnas especificadas solo si la sustancia es la misma
+    # Merge cells for specified columns only if the substance is the same
     merge_columns = [
-    'Archivo',
-    'Nombre de la Sustancia Química',
-    'Idioma de la HDS',
-    'Palabra de Advertencia',
-    'Indicaciones de toxicología',
-    'Pictogramas',
-    'Identificaciones de peligro H',
-    'Consejos de Prudencia P',
-    'Olor',
-    'Color',
-    'pH de la sustancia',
-    'temperatura_ebullicion (Valor)',
-    'temperatura_ebullicion (Unidades)',
-    'punto_congelacion (Valor)',
-    'punto_congelacion (Unidades)',
-    'densidad (Valor)',
-    'densidad (Unidades)',
-    'punto_inflamacion (Valor)',
-    'punto_inflamacion (Unidades)',
-    'velocidad_evaporacion (Valor)',
-    'velocidad_evaporacion (Unidades)',
-    'presion_vapor (Valor)',
-    'presion_vapor (Unidades)',
-    'solubilidad_agua (Valor)',
-    'solubilidad_agua (Unidades)',
-    'Propiedades Explosivas',
-    'Propiedades Comburentes',
-    'Tamaño de Partícula',
-    'Límite inferior de inflamabilidad',
-    'Límite superior de inflamabilidad']
+        'Archivo',
+        'Nombre de la Sustancia Química',
+        'Idioma de la HDS',
+        'Sujeta a GEI',
+        'Sujeta a RETC',
+        'Palabra de Advertencia',
+        'Indicaciones de toxicología',
+        'Pictogramas',
+        'Estado Físico',
+        'Identificaciones de peligro H',
+        'Consejos de Prudencia P',
+        'Olor',
+        'Color',
+        'pH de la sustancia',
+        'temperatura_ebullicion (Valor)',
+        'temperatura_ebullicion (Unidades)',
+        'punto_congelacion (Valor)',
+        'punto_congelacion (Unidades)',
+        'densidad (Valor)',
+        'densidad (Unidades)',
+        'punto_inflamacion (Valor)',
+        'punto_inflamacion (Unidades)',
+        'velocidad_evaporacion (Valor)',
+        'velocidad_evaporacion (Unidades)',
+        'presion_vapor (Valor)',
+        'presion_vapor (Unidades)',
+        'solubilidad_agua (Valor)',
+        'solubilidad_agua (Unidades)',
+        'Propiedades Explosivas',
+        'Propiedades Comburentes',
+        'Tamaño de Partícula',
+        'Límite inferior de inflamabilidad',
+        'Límite superior de inflamabilidad',
+    ]
 
-    # Combinación de celdas para las columnas especificadas solo si la sustancia es la misma
+    # Initialize dictionaries to track current values and start rows for merging
     current_values = {col: None for col in merge_columns}
-    start_rows = {col: 2 for col in merge_columns}  # Asume que comienza en la fila 2 (después del encabezado)
+    start_rows = {col: 2 for col in merge_columns}  # Assume starting at row 2 (after header)
     current_sustancia = None
-    start_row_sustancia = 2
+
 
     for row in range(2, ws.max_row + 1):
-        sustancia_value = ws[f'B{row}'].value  # Columna B para Nombre de la Sustancia Química
+        sustancia_value = ws[f'B{row}'].value  # Column B for Substance Name
         if sustancia_value != current_sustancia:
-            # Si la sustancia cambia, combinar las celdas previas
+            # If the substance changes, merge previous cells
             for col_name in merge_columns:
                 if current_values[col_name] is not None:
                     ws.merge_cells(start_row=start_rows[col_name], start_column=df.columns.get_loc(col_name) + 1, 
@@ -363,64 +450,69 @@ def export_to_excel(data:list, output_file:str ="output.xlsx")->None:
             current_sustancia = sustancia_value
             start_row_sustancia = row
         else:
-            # Si la sustancia no cambia, verificar las columnas para combinar
+            # If the substance does not change, check columns for merging
             for col_name in merge_columns:
-                col_letter = get_column_letter(df.columns.get_loc(col_name) + 1)  # Obtener la letra de la columna
+                col_letter = get_column_letter(df.columns.get_loc(col_name) + 1)  # Get column letter
                 cell_value = ws[f'{col_letter}{row}'].value
 
                 if cell_value == current_values[col_name]:
-                    ws[f'{col_letter}{row}'].value = None  # Vaciar celdas duplicadas
+                    ws[f'{col_letter}{row}'].value = None  # Clear duplicate cells
                 else:
-                    # Si detecta un valor diferente, combinar las celdas anteriores
+                    # If a different value is detected, merge previous cells
                     if current_values[col_name] is not None:
                         ws.merge_cells(start_row=start_rows[col_name], start_column=df.columns.get_loc(col_name) + 1, 
                                        end_row=row - 1, end_column=df.columns.get_loc(col_name) + 1)
                     current_values[col_name] = cell_value
                     start_rows[col_name] = row
 
-    # Combinar las celdas del último grupo de la misma sustancia
+    # Merge cells for the last group of the same substance
     for col_name in merge_columns:
         if current_values[col_name] is not None:
             ws.merge_cells(start_row=start_rows[col_name], start_column=df.columns.get_loc(col_name) + 1, 
                            end_row=ws.max_row, end_column=df.columns.get_loc(col_name) + 1)
 
-    # Fijar el ancho de las columnas según lo que esperas ver
+    # Set the column widths as expected
     fixed_column_widths = {
-    'A': 10,   # Archivo
-    'B': 20,   # Nombre de la Sustancia Química
-    'C': 5,    # Idioma de la HDS
-    'D': 15,   # Nombre del Componente
-    'E': 12,   # Número CAS del Componente
-    'F': 10,   # Porcentaje del Componente
-    'G': 12,   # Palabra de Advertencia
-    'H': 25,   # Indicaciones de toxicología
-    'I': 20,   # Pictogramas
-    'J': 30,   # Identificaciones de peligro H
-    'K': 30,   # Consejos de Prudencia P
-    'L': 15,   # Olor
-    'M': 15,   # Color
-    'N': 8,    # pH de la sustancia
-    'O': 12,   # temperatura_ebullicion (Valor)
-    'P': 12,   # temperatura_ebullicion (Unidades)
-    'Q': 12,   # punto_congelacion (Valor)
-    'R': 12,   # punto_congelacion (Unidades)
-    'S': 12,   # densidad (Valor)
-    'T': 12,   # densidad (Unidades)
-    'U': 12,   # punto_inflamacion (Valor)
-    'V': 12,   # punto_inflamacion (Unidades)
-    'W': 12,   # velocidad_evaporacion (Valor)
-    'X': 12,   # velocidad_evaporacion (Unidades)
-    'Y': 12,   # presion_vapor (Valor)
-    'Z': 12,   # presion_vapor (Unidades)
-    'AA': 12,  # solubilidad_agua (Valor)
-    'AB': 12,  # solubilidad_agua (Unidades)
-    'AC': 20,  # Propiedades Explosivas
-    'AD': 20,  # Propiedades Comburentes
-    'AE': 15,  # Tamaño de Partícula
-    'AF': 12,  # Límite inferior de inflamabilidad
-    'AG': 12   # Límite superior de inflamabilidad
-        }
-
+        'A': 10,   # Archivo
+        'B': 20,   # Nombre de la Sustancia Química
+        'C': 5,    # Idioma de la HDS
+        'D': 15,   # Nombre del Componente
+        'E': 12,   # Número CAS del Componente
+        'F': 10,   # Porcentaje del Componente
+        'G': 15,   # Componente GEI
+        'H': 8,   # Potencial de Calentamiento Global
+        'I': 12,   # Componente RETC
+        'J': 8,   # MPU
+        'K': 8,   # Emisión Transferencia
+        'L': 12,   # Palabra de Advertencia
+        'M': 25,   # Indicaciones de toxicología
+        'N': 20,   # Pictogramas
+        'O': 15,   # Estado Físico
+        'P': 30,   # Identificaciones de peligro H
+        'Q': 30,   # Consejos de Prudencia P
+        'R': 15,   # Olor
+        'S': 15,   # Color
+        'T': 8,    # pH de la sustancia
+        'U': 12,   # temperatura_ebullicion (Valor)
+        'V': 12,   # temperatura_ebullicion (Unidades)
+        'W': 12,   # punto_congelacion (Valor)
+        'X': 12,   # punto_congelacion (Unidades)
+        'Y': 12,   # densidad (Valor)
+        'Z': 12,   # densidad (Unidades)
+        'AA': 12,   # punto_inflamacion (Valor)
+        'AB': 12,  # punto_inflamacion (Unidades)
+        'AC': 12,  # velocidad_evaporacion (Valor)
+        'AD': 12,  # velocidad_evaporacion (Unidades)
+        'AE': 12,  # presion_vapor (Valor)
+        'AF': 12,  # presion_vapor (Unidades)
+        'AG': 12,  # solubilidad_agua (Valor)
+        'AH': 12,  # solubilidad_agua (Unidades)
+        'AI': 20,  # Propiedades Explosivas
+        'AJ': 20,  # Propiedades Comburentes
+        'AK': 15,  # Tamaño de Partícula
+        'AL': 12,  # Límite inferior de inflamabilidad
+        'AM': 12   # Límite superior de inflamabilidad
+    }
 
     for col, width in fixed_column_widths.items():
         ws.column_dimensions[col].width = width
@@ -436,6 +528,8 @@ def export_to_excel(data:list, output_file:str ="output.xlsx")->None:
 
     # Guardar el archivo final
     wb.save(output_file)
+    ##Eliminar el archivo temporal
+    os.remove(temp_file)
 
 
 def process_hds_folder(folder_path:str, project_name:str, client, excel_output:str, json_output:str, progress_callback=None):
@@ -453,15 +547,37 @@ def process_hds_folder(folder_path:str, project_name:str, client, excel_output:s
     Returns:
         tuple: Una tupla con una lista de errores y una lista de todas las sustancias procesadas.
     """
+    # Cargar la tabla RETC
+    retc_file_path = os.path.join('data_sets', 'retc_table.json')
+    gei_file_path = os.path.join('data_sets', 'gei_table.json')
+    with open(retc_file_path, 'r', encoding='utf-8') as f:
+        retc_list = json.load(f)
+        # Convertir la lista de dicts a un dict con el número CAS como clave para acceso rápido
+        retc_data = {entry['numero_cas']: entry for entry in retc_list}
+    with open(gei_file_path, 'r', encoding='utf-8') as f:
+        gei_list = json.load(f)
+        # Crear un diccionario con número CAS como clave
+        gei_data_cas = {entry['CAS']: entry for entry in gei_list}
+        # Crear un diccionario con nombre común como clave
+        gei_data_nombre = {entry['nombre_comun']: entry for entry in gei_list}
+        # Combinar ambos
+        gei_data = {**gei_data_cas, **gei_data_nombre}
     all_sustancias = []
     errores = []
     sustancias_data = []  # Lista para almacenar los datos procesados para Excel
+    progress_percent = 0
 
     pdf_files = [f for f in os.listdir(folder_path) if f.lower().endswith('.pdf')]
     total_files = len(pdf_files)
+    # progress_callback(progress_percent, pdf_files[0] if pdf_files else "")
 
     for index, filename in enumerate(pdf_files):
+        
+        
         file_path = os.path.join(folder_path, filename)
+         # Calcular el progreso y llamar al callback
+        if progress_callback:
+            progress_callback(progress_percent, filename)
 
         # Leer el contenido de la HDS
         hds_text = extract_text_from_pdf(file_path)
@@ -477,18 +593,15 @@ def process_hds_folder(folder_path:str, project_name:str, client, excel_output:s
             hds_dict["Archivo"] = filename
 
             # Postprocesar para Excel
-            sustancias_data.extend(flatten_hds_data(hds_dict))
+            sustancias_data.extend(flatten_hds_data(hds_dict, retc_data,gei_data))
 
             print(f"Procesado correctamente: {filename}")
+            progress_percent = (index + 1) * 100 // total_files
             all_sustancias.append(hds_dict)
         except Exception as e:
             print(f"Error al procesar {filename}: {e}")
             errores.append(filename)
 
-        # Calcular el progreso y llamar al callback
-        if progress_callback:
-            progress_percent = int((index + 1) / total_files * 100)
-            progress_callback(progress_percent, filename)
 
     # Guardar el JSON final con todas las sustancias
     with open(json_output, 'w', encoding='utf-8') as output_file:
@@ -505,4 +618,4 @@ if __name__ == "__main__":
     openai.api_key = os.getenv("OPENAI_API_KEY")
     example_path="ejemplo/"
     client = openai.OpenAI()
-    process_hds_folder(example_path, "Ejemplo",client,'ejemplo/prueba.xlsx','ejemplo/prueba.json')
+    process_hds_folder(example_path, "Prueba GEI y RETC",client,'ejemplo/prueba2.xlsx','ejemplo/prueba2.json')

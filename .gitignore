@@ -1,8 +1,15 @@
 .env
 .Dockerfile
 myenv/
-*.json
+.json
 venv/
 env/
 .env
 *.xlsx
+config.json
+__pycache__/
+*.pyc
+.DS_Store
+__pycache__/process_hds.cpython-310.pyc
+__pycache__/schemas.cpython-310.pyc
+ejemplo/prueba_ConcentradoHDSs.json

@@ -1,0 +1,411 @@
+[
+    {
+      "nombre_comun": "Triclorofluorometano",
+      "nombre_quimico": "CCl3F",
+      "CAS": "75-69-4",
+      "PCG": 4660
+    },
+    {
+      "nombre_comun": "Diclodifluorometano",
+      "nombre_quimico": "CCl2F2",
+      "CAS": "75-71-8",
+      "PCG": 10200
+    },
+    {
+      "nombre_comun": "Clotrifluorometano",
+      "nombre_quimico": "CClF3",
+      "CAS": "75-72-9",
+      "PCG": 13900
+    },
+    {
+      "nombre_comun": "1,1,2-tricloro-1,2,2-trifluoroetano",
+      "nombre_quimico": "CCl2FCClF2",
+      "CAS": "76-13-1",
+      "PCG": 5820
+    },
+    {
+      "nombre_comun": "1,2-dicloro-1,1,2,2-tetrafluoroetano",
+      "nombre_quimico": "CClF2CClF2",
+      "CAS": "76-14-2",
+      "PCG": 8590
+    },
+    {
+      "nombre_comun": "Cloropentafluoroetano",
+      "nombre_quimico": "CClF2CF3",
+      "CAS": "76-15-3",
+      "PCG": 7670
+    },
+    {
+      "nombre_comun": "Bromoclorodifluorometano",
+      "nombre_quimico": "CBrClF2",
+      "CAS": "353-59-3",
+      "PCG": 1750
+    },
+    {
+      "nombre_comun": "1,1,1-trifluoro-2-bromoetano",
+      "nombre_quimico": "CH2BrCF3",
+      "CAS": "431-63-0",
+      "PCG": 173
+    },
+    {
+      "nombre_comun": "Clorodifluorometano",
+      "nombre_quimico": "CHClF2",
+      "CAS": "75-45-6",
+      "PCG": 1760
+    },
+    {
+      "nombre_comun": "2,2-dicloro-1,1,1-trifluoroetano",
+      "nombre_quimico": "CHCl2CF3",
+      "CAS": "306-83-2",
+      "PCG": 79
+    },
+    {
+      "nombre_comun": "2-cloro-1,1,1,2-tetrafluoroetano",
+      "nombre_quimico": "CHClFCF3",
+      "CAS": "2837-89-0",
+      "PCG": 527
+    },
+    {
+      "nombre_comun": "1,1-dicloro-1-fluoroetano",
+      "nombre_quimico": "CH3CCl2F",
+      "CAS": "1717-00-6",
+      "PCG": 782
+    },
+    {
+      "nombre_comun": "1-cloro-1,1-difluoroetano",
+      "nombre_quimico": "CH3CClF2",
+      "CAS": "75-68-3",
+      "PCG": 1980
+    },
+    {
+      "nombre_comun": "3,3-dicloro-1,1,1,2,2-pentafluoropropano",
+      "nombre_quimico": "CHCl2CF2CF3",
+      "CAS": "422-56-0",
+      "PCG": 127
+    },
+    {
+      "nombre_comun": "1,3-dicloro-1,1,2,2,3-pentafluoropropano",
+      "nombre_quimico": "CHClFCF2CClF2",
+      "CAS": "507-55-1",
+      "PCG": 525
+    },
+    {
+      "nombre_comun": "Trifluorometano",
+      "nombre_quimico": "CHF3",
+      "CAS": "75-46-7",
+      "PCG": 12400
+    },
+    {
+      "nombre_comun": "Difluorometano",
+      "nombre_quimico": "CH2F2",
+      "CAS": "75-10-5",
+      "PCG": 677
+    },
+    {
+      "nombre_comun": "Fluorometano",
+      "nombre_quimico": "CH3F",
+      "CAS": "593-53-3",
+      "PCG": 116
+    },
+    {
+      "nombre_comun": "Pentafluoroetano",
+      "nombre_quimico": "CHF2CF3",
+      "CAS": "354-33-6",
+      "PCG": 3170
+    },
+    {
+      "nombre_comun": "1,1,2,2-tetrafluoroetano",
+      "nombre_quimico": "CHF2CHF2",
+      "CAS": "359-35-3",
+      "PCG": 1120
+    },
+    {
+      "nombre_comun": "1,1,1,2-tetrafluoroetano",
+      "nombre_quimico": "CH2FCF3",
+      "CAS": "811-97-2",
+      "PCG": 1300
+    },
+    {
+      "nombre_comun": "1,1,2-trifluoroetano",
+      "nombre_quimico": "CH2FCHF2",
+      "CAS": "430-66-0",
+      "PCG": 328
+    },
+    {
+      "nombre_comun": "1,1,1-trifluoroetano",
+      "nombre_quimico": "CH3CF3",
+      "CAS": "420-46-2",
+      "PCG": 4800
+    },
+    {
+      "nombre_comun": "1,2-difluoroetano",
+      "nombre_quimico": "CH2FCH2F",
+      "CAS": "624-72-6",
+      "PCG": 16
+    },
+    {
+      "nombre_comun": "1,1-difluoroetano",
+      "nombre_quimico": "CH3CHF2",
+      "CAS": "75-37-6",
+      "PCG": 138
+    },
+    {
+      "nombre_comun": "1,1,1,2,3,3,3-heptafluoropropano",
+      "nombre_quimico": "CF3CHFCF3",
+      "CAS": "431-89-0",
+      "PCG": 3350
+    },
+    {
+      "nombre_comun": "1,1,1,3,3,3-hexafluoropropano",
+      "nombre_quimico": "CF3CH2CF3",
+      "CAS": "690-39-1",
+      "PCG": 8060
+    },
+    {
+      "nombre_comun": "1,1,2,2,3-pentafluoropropano",
+      "nombre_quimico": "CH2FCF2CHF2",
+      "CAS": "679-86-7",
+      "PCG": 716
+    },
+    {
+      "nombre_comun": "1,1,1,3,3-pentafluoropropano",
+      "nombre_quimico": "CHF2CH2CF3",
+      "CAS": "460-73-1",
+      "PCG": 858
+    },
+    {
+      "nombre_comun": "1,1,1,3,3-pentafluorobutano",
+      "nombre_quimico": "CH3CF2CH2CF3",
+      "CAS": "406-58-6",
+      "PCG": 804
+    },
+    {
+      "nombre_comun": "1,1,1,2,2,3,4,5,5,5-decafluoropentano",
+      "nombre_quimico": "CF3CHFCHFCF2CF3",
+      "CAS": "163702-07-6",
+      "PCG": 1650
+    },
+    {
+      "nombre_comun": "Trifluoruro de nitrógeno",
+      "nombre_quimico": "NF3",
+      "CAS": "7783-54-2",
+      "PCG": 16100
+    },
+    {
+      "nombre_comun": "Hexafluoruro de azufre",
+      "nombre_quimico": "SF6",
+      "CAS": "2551-62-4",
+      "PCG": 23500
+    },
+    {
+      "nombre_comun": "Tetrafluorometano",
+      "nombre_quimico": "CF4",
+      "CAS": "75-73-0",
+      "PCG": 6630
+    },
+    {
+      "nombre_comun": "Hexafluoroetano",
+      "nombre_quimico": "C2F6",
+      "CAS": "76-16-4",
+      "PCG": 11100
+    },
+    {
+      "nombre_comun": "Octafluoropropano",
+      "nombre_quimico": "C3F8",
+      "CAS": "76-19-7",
+      "PCG": 8900
+    },
+    {
+      "nombre_comun": "Octafluorociclobutano",
+      "nombre_quimico": "c-C4F8",
+      "CAS": "115-25-3",
+      "PCG": 9540
+    },
+    {
+      "nombre_comun": "Decafluorobutano",
+      "nombre_quimico": "C4F10",
+      "CAS": "355-25-9",
+      "PCG": 9200
+    },
+    {
+      "nombre_comun": "Dodecafluoropentano",
+      "nombre_quimico": "n-C5F12",
+      "CAS": "678-26-2",
+      "PCG": 8550
+    },
+    {
+      "nombre_comun": "Tetradecafluorohexano",
+      "nombre_quimico": "n-C6F14",
+      "CAS": "355-42-0",
+      "PCG": 7910
+    },
+    {
+      "nombre_comun": "Metano",
+      "nombre_quimico": "CH4",
+      "CAS": "74-82-8",
+      "PCG": 28
+    },
+    {
+      "nombre_comun": "Óxido nitroso",
+      "nombre_quimico": "N2O",
+      "CAS": "10024-97-2",
+      "PCG": 265
+    },
+    {
+      "nombre_comun": "Carbono Negro",
+      "nombre_quimico": "CN",
+      "CAS": null,
+      "PCG": 900
+    },
+    {
+      "nombre_comun": "HFE125 (Pentafluorodimetil éter)",
+      "nombre_quimico": "CHF2OCF3",
+      "CAS": "406-58-6",
+      "PCG": 12400
+    },
+    {
+      "nombre_comun": "HFE134 (1,1,3,3-Tetrafluorodimetil éter)",
+      "nombre_quimico": "CHF2OCHF2",
+      "CAS": "359-13-7",
+      "PCG": 5560
+    },
+    {
+      "nombre_comun": "HFE143a (Trifluorometil metil éter)",
+      "nombre_quimico": "CH3OCF3",
+      "CAS": "421-14-7",
+      "PCG": 523
+    },
+    {
+      "nombre_comun": "HFE227ea (1,2,2,2-Tetrafluoroetil trifluorometil éter)",
+      "nombre_quimico": "CF3CHFOCF3",
+      "CAS": "134237-51-7",
+      "PCG": 6450
+    },
+    {
+      "nombre_comun": "HFE236ca12 (Bis(difluorometoxi)difluorometano)",
+      "nombre_quimico": "CHF2OCF2OCHF2",
+      "CAS": "15290-77-4",
+      "PCG": 4240
+    },
+    {
+      "nombre_comun": "HFE236ea2 (1,2,2,2-Tetrafluoroetil difluorometil éter)",
+      "nombre_quimico": "CHF2OCHFCF3",
+      "CAS": "311-97-5",
+      "PCG": 1790
+    },
+    {
+      "nombre_comun": "HFE236fa (2,2,2-Trifluoroetil trifluorometil éter)",
+      "nombre_quimico": "CF3CH2OCF3",
+      "CAS": "1991-86-8",
+      "PCG": 979
+    },
+    {
+      "nombre_comun": "HFE245cb2 (Pentafluoroetil metil éter)",
+      "nombre_quimico": "CH3OCF2CF3",
+      "CAS": "156-99-0",
+      "PCG": 654
+    },
+    {
+      "nombre_comun": "HFE245fa1 (2,2-Difluoroetil trifluorometil éter)",
+      "nombre_quimico": "CHF2CH2OCF3",
+      "CAS": "406-78-0",
+      "PCG": 828
+    },
+    {
+      "nombre_comun": "HFE245fa2 (Difluorometil 2,2,2-trifluoroetil éter)",
+      "nombre_quimico": "CHF2OCH2CF3",
+      "CAS": "22005-51-2",
+      "PCG": 812
+    },
+    {
+      "nombre_comun": "HFE263fb1 (2,2,2-Trifluoroetil metil éter)",
+      "nombre_quimico": "CF3CH2OCH3",
+      "CAS": "460-43-5",
+      "PCG": 1
+    },
+    {
+      "nombre_comun": "HFE329mcc2 (Pentafluoroetil 1,1,2,2-tetrafluoroetil éter)",
+      "nombre_quimico": "CF3CF2OCF2CHF2",
+      "CAS": "756-13-8",
+      "PCG": 3070
+    },
+    {
+      "nombre_comun": "HFE338mcf2 (Pentafluoroetil 2,2,2-trifluoroetil éter)",
+      "nombre_quimico": "CF3CF2OCH2CF3",
+      "CAS": "188690-78-0",
+      "PCG": 929
+    },
+    {
+      "nombre_comun": "HFE347mcc3 (Heptafluoropropil metil éter)",
+      "nombre_quimico": "CH3OCF2CF2CF3",
+      "CAS": "1691-17-4",
+      "PCG": 530
+    },
+    {
+      "nombre_comun": "HFE347mcf2 (Pentafluoroetil 2,2-difluoroetil éter)",
+      "nombre_quimico": "CF3CF2OCH2CHF2",
+      "CAS": "188690-77-9",
+      "PCG": 854
+    },
+    {
+      "nombre_comun": "HFE347pcf2 (1,1,2,2-Tetrafluoroetil 2,2,2-trifluoroetil éter)",
+      "nombre_quimico": "CHF2CF2OCH2CF3",
+      "CAS": "406-78-0",
+      "PCG": 889
+    },
+    {
+      "nombre_comun": "HFE356mec3 (1,1,2,3,3,3-Hexafluoropropil metil éter)",
+      "nombre_quimico": "CH3OCF2CHFCF3",
+      "CAS": "13171-18-1",
+      "PCG": 387
+    },
+    {
+      "nombre_comun": "HFE356pcc3 (1,1,2,2,3,3-Hexafluoropropil metil éter)",
+      "nombre_quimico": "CH3OCF2CF2CHF2",
+      "CAS": "1991-86-8",
+      "PCG": 413
+    },
+    {
+      "nombre_comun": "HFE356pcf2 (2,2-Difluoroetil 1,1,2,2-tetrafluoroetil éter)",
+      "nombre_quimico": "CHF2CH2OCF2CHF2",
+      "CAS": "187588-74-7",
+      "PCG": 719
+    },
+    {
+      "nombre_comun": "HFE356pcf3 (2,2,3,3-Tetrafluoropropil difluorometil éter)",
+      "nombre_quimico": "CHF2OCH2CF2CHF2",
+      "CAS": "188690-76-8",
+      "PCG": 446
+    },
+    {
+      "nombre_comun": "HFE374pc2 (Etil 1,1,2,2-tetrafluoroetil éter)",
+      "nombre_quimico": "CH3CH2OCF2CHF2",
+      "CAS": "425-98-3",
+      "PCG": 627
+    },
+    {
+      "nombre_comun": "HFE449s1 (Nonafluorobutil metil éter)",
+      "nombre_quimico": "C4F9OCH3",
+      "CAS": "163702-07-6",
+      "PCG": 421
+    },
+    {
+      "nombre_comun": "HFE569sf2 (Nonafluorobutil etil éter)",
+      "nombre_quimico": "C4F9OC2H5",
+      "CAS": "163702-05-4",
+      "PCG": 57
+    },
+    {
+      "nombre_comun": "HFE338mmz1 (1,1,1,3,3,3-Hexafluoroisopropil difluorometil éter)",
+      "nombre_quimico": "CHF2OCH(CF3)2",
+      "CAS": "188690-76-8",
+      "PCG": 2620
+    },
+    {
+      "nombre_comun": "HFE347mmy1 (Heptafluoroisopropil metil éter)",
+      "nombre_quimico": "CH3OCF(CF3)2",
+      "CAS": "1868-53-7",
+      "PCG": 363
+    }
+  ]
+  

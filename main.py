@@ -1,23 +1,27 @@
 # main.py
 import sys
 import os
+import json
+import subprocess
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QLineEdit, QPushButton,
     QVBoxLayout, QFileDialog, QMessageBox, QProgressBar
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
-from process_hds import process_hds_folder
+from PyQt5.QtGui import QMovie
+from PyQt5.QtCore import  Qt,QThread, pyqtSignal
 import openai
-import json
+from process_hds import process_hds_folder
+
+
 # Obtener la ruta donde está ubicado el ejecutable o script principal
 BASE_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
 
 # Ruta del archivo de configuración incluyendo ruta absoluta
 CONFIG_FILE = os.path.join(BASE_DIR, 'config.json')
 
-import subprocess
 
 def check_tesseract_installed():
+    """Check if Tesseract OCR is installed on the system."""
     try:
         subprocess.run(["tesseract", "-v"], check=True)
     except FileNotFoundError:
@@ -151,6 +155,13 @@ class MainApp(QWidget):
         self.btn_process.clicked.connect(self.start_processing)
         layout.addWidget(self.btn_process)
 
+        # Etiqueta para mostrar la animación de carga
+        self.loading_label = QLabel(self)
+        self.loading_movie = QMovie("loading.gif")
+        self.loading_label.setMovie(self.loading_movie)
+        self.loading_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.loading_label)
+        # self.loading_label.hide()
         # Barra de progreso
         self.progress_bar = QProgressBar(self)
         self.progress_bar.setValue(0)
@@ -194,6 +205,8 @@ class MainApp(QWidget):
 
         # Mostrar un mensaje de inicio
         QMessageBox.information(self, 'Inicio de Procesamiento', 'El procesamiento ha comenzado.')
+        self.loading_label.show()
+        self.loading_movie.start()
 
         # Iniciar el hilo de procesamiento con las rutas de entrada y salida
         self.thread = WorkerThread(self.input_dir, self.output_dir, self.api_key, project_name)
@@ -215,6 +228,10 @@ class MainApp(QWidget):
         self.btn_browse_input.setEnabled(True)
         self.btn_browse_output.setEnabled(True)
         self.btn_process.setEnabled(True)
+
+        #Detener y ocultar la animación de carga
+        self.loading_movie.stop()
+        self.loading_label.hide()
 
         # Resetear la barra de progreso y etiqueta del archivo actual
         self.progress_bar.setValue(0)
