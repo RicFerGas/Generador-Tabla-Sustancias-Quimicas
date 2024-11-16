@@ -13,12 +13,20 @@ import openai
 from process_hds import process_hds_folder
 
 
-# Obtener la ruta donde está ubicado el ejecutable o script principal
-BASE_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+            # Running in a PyInstaller bundle
+            BASE_DIR= os.path.dirname(os.path.abspath(__file__))
+            INTERNAL_BASE_DIR = sys._MEIPASS
+else:
+            # Running in a normal Python environment
+            BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+            INTERNAL_BASE_DIR = BASE_DIR
 
 # Ruta del archivo de configuración incluyendo ruta absoluta
 CONFIG_FILE = os.path.join(BASE_DIR, 'config.json')
 
+# Get the absolute path to the model directory
+model_path = os.path.abspath('./models/xx_ent_wiki_sm/xx_ent_wiki_sm')
 
 def check_tesseract_installed():
     """Check if Tesseract OCR is installed on the system."""
@@ -155,9 +163,12 @@ class MainApp(QWidget):
         self.btn_process.clicked.connect(self.start_processing)
         layout.addWidget(self.btn_process)
 
+        
         # Etiqueta para mostrar la animación de carga
+        loading_path= os.path.join(INTERNAL_BASE_DIR, 'data_sets' ,'loading.gif')
         self.loading_label = QLabel(self)
-        self.loading_movie = QMovie("loading.gif")
+        print(loading_path ,"loading gif seached path")
+        self.loading_movie = QMovie(loading_path)
         self.loading_label.setMovie(self.loading_movie)
         self.loading_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.loading_label)

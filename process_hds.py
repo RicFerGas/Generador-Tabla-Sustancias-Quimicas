@@ -1,5 +1,6 @@
 # process_hds.py
 import os
+import sys
 import json
 import openai
 import pandas as pd
@@ -15,9 +16,17 @@ import fitz  # PyMuPDF
 from rapidfuzz import fuzz, process
 from schemas import HDSData
 
-nlp = spacy.load('xx_ent_wiki_sm')
 
+# Determine base path
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    base_path = sys._MEIPASS
+else:
+    base_path = os.path.dirname(os.path.abspath(__file__))
+model_relative_path = os.path.join('models', 'xx_ent_wiki_sm', 'xx_ent_wiki_sm', 'xx_ent_wiki_sm-3.8.0')
+model_path = os.path.join(base_path, model_relative_path)
 
+# Load the model
+nlp = spacy.load(model_path)
 
 def is_valid_pdf(pdf_path: str) -> bool:
     """
@@ -548,8 +557,19 @@ def process_hds_folder(folder_path:str, project_name:str, client, excel_output:s
         tuple: Una tupla con una lista de errores y una lista de todas las sustancias procesadas.
     """
     # Cargar la tabla RETC
-    retc_file_path = os.path.join('data_sets', 'retc_table.json')
-    gei_file_path = os.path.join('data_sets', 'gei_table.json')
+    # Determine base path
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    
+
+    retc_file_path = os.path.join(base_path,'data_sets', 'retc_table.json')
+    print("RETC FILE PATH: ",retc_file_path)
+
+    gei_file_path = os.path.join(base_path,'data_sets', 'gei_table.json')
+    print("GEI FILE PATH: ",gei_file_path)
+
     with open(retc_file_path, 'r', encoding='utf-8') as f:
         retc_list = json.load(f)
         # Convertir la lista de dicts a un dict con el número CAS como clave para acceso rápido
