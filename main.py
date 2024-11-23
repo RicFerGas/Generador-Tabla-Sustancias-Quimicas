@@ -10,7 +10,8 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QMovie
 from PyQt5.QtCore import  Qt,QThread, pyqtSignal
 import openai
-from process_hds import process_hds_folder
+from hds_processor import HDSProcessor
+
 
 
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
@@ -106,24 +107,18 @@ class WorkerThread(QThread):
             os.environ["OPENAI_API_KEY"] = self.api_key
             openai.api_key = self.api_key
             client = openai.OpenAI()
+            processor= HDSProcessor(client,INTERNAL_BASE_DIR)
 
             # Definir el callback para el progreso
             def progress_callback(progress, filename):
                 self.file_processed.emit(progress, filename)
-
-            # Definir rutas de salida para Excel y JSON en el directorio seleccionado
-            excel_output = os.path.join(self.output_dir, f'{self.project_name}_ConcentradoHDSs.xlsx')
-            json_output = os.path.join(self.output_dir, f'{self.project_name}_ConcentradoHDSs.json')
-
-            # Llamar a la función de procesamiento con el callback
-            process_hds_folder(
-                self.input_dir, 
-                self.project_name, 
-                client, 
-                excel_output,
-                json_output,
-                progress_callback
-            )
+            
+            # Procesar el directorio de entrada
+            
+            _,_= processor.process_folder(
+                self.input_dir,
+                self.project_name,
+                progress_callback)
 
             self.finished.emit(True)
         except Exception as e:

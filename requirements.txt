@@ -12,3 +12,5 @@ pytesseract
 pillow
 PyPDF2
 PyMuPDF
+python-docx
+docx

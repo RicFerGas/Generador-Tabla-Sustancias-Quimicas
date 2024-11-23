@@ -47,8 +47,8 @@ exe = EXE(
         'CFBundleName': 'Generador de Tabla HDS',
         'CFBundleDisplayName': 'Generador de Tabla HDS',
         'CFBundleIdentifier': 'com.SIGASH.generadorhds',
-        'CFBundleVersion': '1.0.0',
-        'CFBundleShortVersionString': '1.0.0',
+        'CFBundleVersion': '1.1.0',
+        'CFBundleShortVersionString': '1.1.0',
     },
 )
 

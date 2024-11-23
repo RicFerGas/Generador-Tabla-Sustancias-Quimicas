@@ -1,0 +1,56 @@
+[
+    {
+      "pictograma": "Bomba explotando",
+      "peligro": "Explosivos",
+      "codigo": "GHS01",
+      "ruta_imagen": "./data_sets/pictograms/GHS01.png"
+    },
+    {
+      "pictograma": "Llama",
+      "peligro": "Inflamables",
+      "codigo": "GHS02",
+      "ruta_imagen": "./data_sets/pictograms/GHS02.png"
+    },
+    {
+      "pictograma": "Llama sobre un círculo",
+      "peligro": "Comburentes",
+      "codigo": "GHS03",
+      "ruta_imagen": "./data_sets/pictograms/GHS03.png"
+    },
+    {
+      "pictograma": "Cilindro de gas",
+      "peligro": "Gases Comprimidos",
+      "codigo": "GHS04",
+      "ruta_imagen": "./data_sets/pictograms/GHS04.png"
+    },
+    {
+      "pictograma": "Corrosión",
+      "peligro": "Corrosivos",
+      "codigo": "GHS05",
+      "ruta_imagen": "./data_sets/pictograms/GHS05.png"
+    },
+    {
+      "pictograma": "Calavera y tibias cruzadas",
+      "peligro": "Toxicidad Aguda",
+      "codigo": "GHS06",
+      "ruta_imagen": "./data_sets/pictograms/GHS06.png"
+    },
+    {
+      "pictograma": "Signo de exclamación",
+      "peligro": "Irritantes",
+      "codigo": "GHS07",
+      "ruta_imagen": "./data_sets/pictograms/GHS07.png"
+    },
+    {
+      "pictograma": "Peligro para la salud",
+      "peligro": "Peligro Crónico para la Salud",
+      "codigo": "GHS08",
+      "ruta_imagen": "./data_sets/pictograms/GHS08.png"
+    },
+    {
+      "pictograma": "Medio ambiente",
+      "peligro": "Peligro Ambiental",
+      "codigo": "GHS09",
+      "ruta_imagen": "./data_sets/pictograms/GHS09.png"
+    }
+  ]

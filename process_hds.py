@@ -7,8 +7,9 @@ import pandas as pd
 from dotenv import load_dotenv
 from pdf2image import convert_from_path
 from openpyxl import load_workbook
-from openpyxl.utils import get_column_letter
+from openpyxl.utils import get_column_letter,range_boundaries
 from openpyxl.styles import Alignment
+from openpyxl.drawing.image import Image
 import pytesseract
 import PyPDF2
 import spacy
@@ -191,6 +192,19 @@ def flatten_hds_data(hds_dict: dict, retc_data: dict, gei_data: dict) -> list:
     sustancias_flat = []
 
     # Información común para todas las filas de la sustancia
+    pictogram_columns = {
+    'bomba_explotando': 'Explosivos',
+    'llama': 'Inflamables',
+    'llama_sobre_circulo': 'Comburentes',
+    'cilindro_de_gas': 'Gases Comprimidos',
+    'corrosion': 'Corrosivos',
+    'calavera_tibias_cruzadas': 'Toxicidad Aguda',
+    'signo_de_exclamacion': 'Irritantes',
+    'peligro_para_la_salud': 'Peligro Crónico para la Salud',
+    'medio_ambiente': 'Peligro Ambiental'}
+    
+    
+
     common_info = {
         'Archivo': hds_dict.get('Archivo'),
         'Nombre de la Sustancia Química': hds_dict.get('nombre_sustancia_quimica'),
@@ -208,6 +222,11 @@ def flatten_hds_data(hds_dict: dict, retc_data: dict, gei_data: dict) -> list:
         'Propiedades Comburentes': hds_dict.get('propiedades_comburentes'),
         'Tamaño de Partícula': hds_dict.get('tamano_particula'),
     }
+    # Extract pictogram booleans and map to hazards
+    pictogramas = hds_dict.get('pictogramas', {})
+    for field_name, hazard_name in pictogram_columns.items():
+        is_present = pictogramas.get(field_name, False)
+        common_info[hazard_name] = is_present
 
     # Desanidar propiedades numéricas
     propiedades = [
@@ -332,8 +351,45 @@ def flatten_hds_data(hds_dict: dict, retc_data: dict, gei_data: dict) -> list:
     return sustancias_flat
 
 
+def combine_headers(ws, df):
+    """
+    Combines cells in the header row (row 1) to organize related properties.
+    """
+    # Define the column groups and their respective combined headers
+    header_groups = {
+        'Pictogramas': ['Explosivos', 'Inflamables', 'Comburentes', 'Gases Comprimidos', 
+                        'Corrosivos', 'Toxicidad Aguda', 'Irritantes', 
+                        'Peligro Crónico para la Salud', 'Peligro Ambiental'],
+        'Propiedades Físicas': ['temperatura_ebullicion (Valor)', 'temperatura_ebullicion (Unidades)', 
+                                'punto_congelacion (Valor)', 'punto_congelacion (Unidades)', 
+                                'densidad (Valor)', 'densidad (Unidades)', 
+                                'punto_inflamacion (Valor)', 'punto_inflamacion (Unidades)', 
+                                'presion_vapor (Valor)', 'presion_vapor (Unidades)', 
+                                'solubilidad_agua (Valor)', 'solubilidad_agua (Unidades)']
+    }
 
-def export_to_excel(data:list, output_file:str ="output.xlsx")->None:
+    for group_name, columns in header_groups.items():
+        # Find the columns by name in the DataFrame
+        column_indices = [df.columns.get_loc(col) + 1 for col in columns if col in df.columns]
+
+        if column_indices:
+            # Combine the cells in the first row
+            first_col = min(column_indices)
+            last_col = max(column_indices)
+            ws.merge_cells(start_row=1, start_column=first_col, end_row=1, end_column=last_col)
+            header_cell = ws.cell(row=1, column=first_col)
+            header_cell.value = group_name
+            header_cell.alignment = Alignment(horizontal='center', vertical='center')
+
+    # Adjust the individual headers in row 2
+    for col_num, column_title in enumerate(df.columns, 1):
+        cell = ws.cell(row=2, column=col_num)
+        # Skip merged cells and only set values for the top-left cell of a merged range
+        if not isinstance(cell, MergedCell):
+            cell.value = column_title
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+
+def export_to_excel(data:list, peligro_a_pictograma:dict, output_file:str ="output.xlsx")->None:
     """
     Exporta los datos de las sustancias a un archivo Excel con celdas combinadas y alineadas.
 
@@ -347,14 +403,15 @@ def export_to_excel(data:list, output_file:str ="output.xlsx")->None:
     # Crear DataFrame de pandas
     df = pd.DataFrame(data)
 
+
     # Define the desired order of columns
     column_order = [
         'Archivo',                         # 1. File name
         'Nombre de la Sustancia Química',   # 2. Substance name
         'Idioma de la HDS',                 # 3. Language
-        'Nombre del Componente',            # 4. Component name
         'Sujeta a GEI',                     # 5. GEI component
-        'Sujeta a RETC',                    # 6. RETC component
+        'Sujeta a RETC',
+        'Nombre del Componente',            # 4. Component name
         'Número CAS del Componente',        # 7. Component CAS number
         'Porcentaje del Componente',        # 8. Component percentage
         'Componente GEI',                   # 9. GEI component
@@ -364,36 +421,45 @@ def export_to_excel(data:list, output_file:str ="output.xlsx")->None:
         'Emision Transferencia',            # 13. Emission transfer
         'Palabra de Advertencia',           # 14. Warning word
         'Indicaciones de toxicología',      # 15. Toxicology indications
-        'Pictogramas',                      # 16. Pictograms
-        'Estado Físico',                    # 17. Physical state
-        'Identificaciones de peligro H',    # 17. Hazard identifications H
-        'Consejos de Prudencia P',          # 18. Precautionary statements P
-        'Olor',                             # 19. Odor
-        'Color',                            # 20. Color
-        'pH de la sustancia',               # 21. pH
-        'temperatura_ebullicion (Valor)',   # 22. Boiling temperature (Value)
-        'temperatura_ebullicion (Unidades)',# 23. Boiling temperature (Units)
-        'punto_congelacion (Valor)',        # 24. Freezing point (Value)
-        'punto_congelacion (Unidades)',     # 25. Freezing point (Units)
-        'densidad (Valor)',                 # 26. Density (Value)
-        'densidad (Unidades)',              # 27. Density (Units)
-        'punto_inflamacion (Valor)',        # 28. Flash point (Value)
-        'punto_inflamacion (Unidades)',     # 29. Flash point (Units)
-        'velocidad_evaporacion (Valor)',    # 30. Evaporation rate (Value)
-        'velocidad_evaporacion (Unidades)', # 31. Evaporation rate (Units)
-        'presion_vapor (Valor)',            # 32. Vapor pressure (Value)
-        'presion_vapor (Unidades)',         # 33. Vapor pressure (Units)
-        'solubilidad_agua (Valor)',         # 34. Water solubility (Value)
-        'solubilidad_agua (Unidades)',      # 35. Water solubility (Units)
-        'Propiedades Explosivas',           # 36. Explosive properties
-        'Propiedades Comburentes',          # 37. Oxidizing properties
-        'Tamaño de Partícula',              # 38. Particle size
-        'Límite inferior de inflamabilidad',# 39. Lower flammability limit
-        'Límite superior de inflamabilidad'# 40. Upper flammability limit        
+        'Explosivos',                       # 16. Explosives
+        'Inflamables',                      # 17. Flammable
+        'Comburentes',                      # 18. Oxidizing
+        'Gases Comprimidos',                # 19. Compressed gases
+        'Corrosivos',                       # 20. Corrosive
+        'Toxicidad Aguda',                  # 21. Acute toxicity
+        'Irritantes',                       # 22. Irritants
+        'Peligro Crónico para la Salud',    # 23. Chronic health hazard
+        'Peligro Ambiental',                # 24. Environmental hazard
+        'Estado Físico',                    # 25. Physical state
+        'Identificaciones de peligro H',    # 26. Hazard identifications H
+        'Consejos de Prudencia P',          # 27. Precautionary statements P
+        'Olor',                             # 28. Odor
+        'Color',                            # 29. Color
+        'pH de la sustancia',               # 30. pH
+        'temperatura_ebullicion (Valor)',   # 31. Boiling temperature (Value)
+        'temperatura_ebullicion (Unidades)',# 32. Boiling temperature (Units)
+        'punto_congelacion (Valor)',        # 33. Freezing point (Value)
+        'punto_congelacion (Unidades)',     # 34. Freezing point (Units)
+        'densidad (Valor)',                 # 35. Density (Value)
+        'densidad (Unidades)',              # 36. Density (Units)
+        'punto_inflamacion (Valor)',        # 37. Flash point (Value)
+        'punto_inflamacion (Unidades)',     # 38. Flash point (Units)
+        'velocidad_evaporacion (Valor)',    # 39. Evaporation rate (Value)
+        'velocidad_evaporacion (Unidades)', # 40. Evaporation rate (Units)
+        'presion_vapor (Valor)',            # 41. Vapor pressure (Value)
+        'presion_vapor (Unidades)',         # 42. Vapor pressure (Units)
+        'solubilidad_agua (Valor)',         # 43. Water solubility (Value)
+        'solubilidad_agua (Unidades)',      # 44. Water solubility (Units)
+        'Propiedades Explosivas',           # 45. Explosive properties
+        'Propiedades Comburentes',          # 46. Oxidizing properties
+        'Tamaño de Partícula',              # 47. Particle size
+        'Límite inferior de inflamabilidad',# 48. Lower flammability limit
+        'Límite superior de inflamabilidad' # 49. Upper flammability limit
     ]
 
     # Reorder the DataFrame columns
     df = df[column_order]
+    
 
     # Save the DataFrame to a temporary Excel file
     temp_file = "temp_output.xlsx"
@@ -402,132 +468,242 @@ def export_to_excel(data:list, output_file:str ="output.xlsx")->None:
     # Load the Excel file with openpyxl for customization
     wb = load_workbook(temp_file)
     ws = wb.active
-
-    # Merge cells for specified columns only if the substance is the same
-    merge_columns = [
-        'Archivo',
-        'Nombre de la Sustancia Química',
-        'Idioma de la HDS',
-        'Sujeta a GEI',
-        'Sujeta a RETC',
-        'Palabra de Advertencia',
-        'Indicaciones de toxicología',
-        'Pictogramas',
-        'Estado Físico',
-        'Identificaciones de peligro H',
-        'Consejos de Prudencia P',
-        'Olor',
-        'Color',
-        'pH de la sustancia',
-        'temperatura_ebullicion (Valor)',
-        'temperatura_ebullicion (Unidades)',
-        'punto_congelacion (Valor)',
-        'punto_congelacion (Unidades)',
-        'densidad (Valor)',
-        'densidad (Unidades)',
-        'punto_inflamacion (Valor)',
-        'punto_inflamacion (Unidades)',
-        'velocidad_evaporacion (Valor)',
-        'velocidad_evaporacion (Unidades)',
-        'presion_vapor (Valor)',
-        'presion_vapor (Unidades)',
-        'solubilidad_agua (Valor)',
-        'solubilidad_agua (Unidades)',
-        'Propiedades Explosivas',
-        'Propiedades Comburentes',
-        'Tamaño de Partícula',
-        'Límite inferior de inflamabilidad',
-        'Límite superior de inflamabilidad',
+    combine_headers(ws, df)
+    # Insert a new row at the top for the merged cell "Pictogramas"
+    ws.insert_rows(1)
+    # Merge cells for property columns
+    propiedades = [
+        ('temperatura_ebullicion (Valor)', 'temperatura_ebullicion (Unidades)', 'Temperatura de Ebullición'),
+        ('punto_congelacion (Valor)', 'punto_congelacion (Unidades)', 'Punto de Congelación'),
+        ('densidad (Valor)', 'densidad (Unidades)', 'Densidad'),
+        ('punto_inflamacion (Valor)', 'punto_inflamacion (Unidades)', 'Punto de Inflamación'),
+        ('velocidad_evaporacion (Valor)', 'velocidad_evaporacion (Unidades)', 'Velocidad de Evaporación'),
+        ('presion_vapor (Valor)', 'presion_vapor (Unidades)', 'Presión de Vapor'),
+        ('solubilidad_agua (Valor)', 'solubilidad_agua (Unidades)', 'Solubilidad en Agua')
     ]
 
-    # Initialize dictionaries to track current values and start rows for merging
-    current_values = {col: None for col in merge_columns}
-    start_rows = {col: 2 for col in merge_columns}  # Assume starting at row 2 (after header)
+    # First, create a set of all property columns for easy checking
+    propiedad_columns = set()
+    for valor_col, unidades_col, propiedad_name in propiedades:
+        propiedad_columns.update([valor_col, unidades_col])
+
+   # Crear un conjunto de celdas combinadas en la hoja
+    # Modificación para manejar celdas combinadas
+    merged_ranges = ws.merged_cells.ranges
+    merged_cells = {
+        (row, col)
+        for merged_range in merged_ranges
+        for row in range(merged_range.min_row, merged_range.max_row + 1)
+        for col in range(merged_range.min_col, merged_range.max_col + 1)
+    }
+
+    for col_num, column_title in enumerate(df.columns, 1):
+        if (2, col_num) not in merged_cells:  # Si la celda no está combinada
+            ws.cell(row=2, column=col_num).value = column_title
+        elif any(
+            merged_range.min_row == 2 and col_num == merged_range.min_col
+            for merged_range in merged_ranges
+        ):  # Si es la celda principal de un rango combinado
+            ws.cell(row=2, column=col_num).value = column_title
+    # Now handle the propiedades columns
+    for valor_col, unidades_col, propiedad_name in propiedades:
+        # Get column indices
+        valor_idx = df.columns.get_loc(valor_col) + 1
+        unidades_idx = df.columns.get_loc(unidades_col) + 1
+
+        # Merge the property name across the two columns
+        ws.merge_cells(start_row=1, start_column=valor_idx, end_row=1, end_column=unidades_idx)
+        propiedad_cell = ws.cell(row=1, column=valor_idx)
+        propiedad_cell.value = propiedad_name
+        propiedad_cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        # Set 'Valor' and 'Unidades' in the second row
+        ws.cell(row=2, column=valor_idx).value = 'Valor'
+        ws.cell(row=2, column=valor_idx).alignment = Alignment(horizontal='center', vertical='center')
+        ws.cell(row=2, column=unidades_idx).value = 'Unidades'
+        ws.cell(row=2, column=unidades_idx).alignment = Alignment(horizontal='center', vertical='center')
+
+    # Adjust row heights for the header rows
+    ws.row_dimensions[1].height = 30  # Adjust as needed
+    ws.row_dimensions[2].height = 20  # Adjust as needed
+    # Define the columns that correspond to the pictograms
+    pictogram_columns = [
+        'Explosivos',
+        'Inflamables',
+        'Comburentes',
+        'Gases Comprimidos',
+        'Corrosivos',
+        'Toxicidad Aguda',
+        'Irritantes',
+        'Peligro Crónico para la Salud',
+        'Peligro Ambiental',
+    ]
+    # Reemplazar True por 'X' y False por '' en las columnas de pictogramas
+    df[pictogram_columns] = df[pictogram_columns].replace({True: 'X', False: ''})
+    # Find the column indices for the pictogram columns
+    pictogram_col_indices = [df.columns.get_loc(col) + 1 for col in pictogram_columns]
+
+    # Merge cells above the pictogram columns
+    first_pictogram_col = min(pictogram_col_indices)
+    last_pictogram_col = max(pictogram_col_indices)
+    ws.merge_cells(
+        start_row=1,
+        start_column=first_pictogram_col,
+        end_row=1,
+        end_column=last_pictogram_col
+    )
+
+    # Write "Pictogramas" in the merged cell
+    pictogram_header_cell = ws.cell(row=1, column=first_pictogram_col)
+    pictogram_header_cell.value = "Pictogramas"
+    pictogram_header_cell.alignment = Alignment(horizontal='center', vertical='center')
+
+    
+    # Obtener las columnas que ya tienen 'Valor' y 'Unidades' asignados
+    valor_unidades_indices = []
+    for valor_col, unidades_col, _ in propiedades:
+        valor_idx = df.columns.get_loc(valor_col) + 1
+        unidades_idx = df.columns.get_loc(unidades_col) + 1
+        valor_unidades_indices.extend([valor_idx, unidades_idx])
+
+    # Ajustar los encabezados hacia abajo por la fila insertada, sin sobrescribir 'Valor' y 'Unidades'
+    for col_num, column_title in enumerate(df.columns, 1):
+        if col_num not in valor_unidades_indices:
+            ws.cell(row=2, column=col_num).value = column_title
+            ws.cell(row=2, column=col_num).alignment = Alignment(horizontal='center', vertical='center')
+
+    # Insertar imágenes en los encabezados de las columnas de pictogramas
+    for col_index in pictogram_col_indices:
+        col_letter = get_column_letter(col_index)
+        hazard_name = ws.cell(row=2, column=col_index).value
+
+        # Obtener la información del pictograma desde el JSON
+        pictograma_info = peligro_a_pictograma.get(hazard_name)
+        if pictograma_info:
+            image_path = pictograma_info['ruta_imagen']
+            # Asegurarse de que la ruta sea absoluta
+            image_path = os.path.abspath(image_path)
+            if os.path.exists(image_path):
+                
+                img = Image(image_path)
+                img.height = 40  # Ajusta el tamaño según sea necesario
+                img.width = 40
+                img.anchor = f"{col_letter}2"
+                ws.add_image(img)
+                # Limpiar el texto del encabezado
+                ws.cell(row=2, column=col_index).value = None
+            else:
+                print(f"No se encontró la imagen para {hazard_name} en {image_path}")
+        else:
+            print(f"No hay información de pictograma para el peligro: {hazard_name}")
+
+        # Adjust row heights for the header rows
+    ws.row_dimensions[1].height = 30  # Height for "Pictogramas"
+    ws.row_dimensions[2].height = 50  # Height for images
+
+    # Agregar las columnas de 'Valor' y 'Unidades' a propiedad_columns
+    for valor_col, unidades_col, _ in propiedades:
+        propiedad_columns.update([valor_col, unidades_col])
+
+    # Definir las columnas que NO son propiedades ni pictogramas
+    non_property_pictogram_columns = [
+        col for col in df.columns if col not in propiedad_columns and col not in pictogram_columns
+    ]
+
+    # Inicializar diccionarios para el seguimiento de valores actuales y filas de inicio
+    current_values = {col: None for col in non_property_pictogram_columns}
+    start_rows = {col: 3 for col in non_property_pictogram_columns}  # Comienza en la fila 3
     current_sustancia = None
 
-
-    for row in range(2, ws.max_row + 1):
-        sustancia_value = ws[f'B{row}'].value  # Column B for Substance Name
+    for row in range(3, ws.max_row + 1):
+        sustancia_value = ws[f'B{row}'].value  # Columna 'Nombre de la Sustancia Química'
         if sustancia_value != current_sustancia:
-            # If the substance changes, merge previous cells
-            for col_name in merge_columns:
+            # Si cambia la sustancia, combina celdas anteriores
+            for col_name in non_property_pictogram_columns:
                 if current_values[col_name] is not None:
-                    ws.merge_cells(start_row=start_rows[col_name], start_column=df.columns.get_loc(col_name) + 1, 
-                                   end_row=row - 1, end_column=df.columns.get_loc(col_name) + 1)
-                current_values[col_name] = ws[f'{get_column_letter(df.columns.get_loc(col_name) + 1)}{row}'].value
+                    col_idx = df.columns.get_loc(col_name) + 1
+                    ws.merge_cells(start_row=start_rows[col_name], start_column=col_idx,
+                                   end_row=row - 1, end_column=col_idx)
+                current_values[col_name] = ws.cell(row=row, column=df.columns.get_loc(col_name) + 1).value
                 start_rows[col_name] = row
             current_sustancia = sustancia_value
-            start_row_sustancia = row
         else:
-            # If the substance does not change, check columns for merging
-            for col_name in merge_columns:
-                col_letter = get_column_letter(df.columns.get_loc(col_name) + 1)  # Get column letter
-                cell_value = ws[f'{col_letter}{row}'].value
-
+            # Si la sustancia es la misma, verifica para combinar celdas
+            for col_name in non_property_pictogram_columns:
+                col_idx = df.columns.get_loc(col_name) + 1
+                cell_value = ws.cell(row=row, column=col_idx).value
                 if cell_value == current_values[col_name]:
-                    ws[f'{col_letter}{row}'].value = None  # Clear duplicate cells
+                    ws.cell(row=row, column=col_idx).value = None  # Limpiar celdas duplicadas
                 else:
-                    # If a different value is detected, merge previous cells
+                    # Combina celdas anteriores
                     if current_values[col_name] is not None:
-                        ws.merge_cells(start_row=start_rows[col_name], start_column=df.columns.get_loc(col_name) + 1, 
-                                       end_row=row - 1, end_column=df.columns.get_loc(col_name) + 1)
+                        ws.merge_cells(start_row=start_rows[col_name], start_column=col_idx,
+                                       end_row=row - 1, end_column=col_idx)
                     current_values[col_name] = cell_value
                     start_rows[col_name] = row
 
-    # Merge cells for the last group of the same substance
-    for col_name in merge_columns:
+    # Combinar celdas para el último grupo
+    for col_name in non_property_pictogram_columns:
         if current_values[col_name] is not None:
-            ws.merge_cells(start_row=start_rows[col_name], start_column=df.columns.get_loc(col_name) + 1, 
-                           end_row=ws.max_row, end_column=df.columns.get_loc(col_name) + 1)
+            col_idx = df.columns.get_loc(col_name) + 1
+            ws.merge_cells(start_row=start_rows[col_name], start_column=col_idx,
+                           end_row=ws.max_row, end_column=col_idx)
 
-    # Set the column widths as expected
+    # Crear un mapeo de nombres de columna a letras de Excel
+    column_letters = {}
+    for idx, col_name in enumerate(df.columns, 1):
+        col_letter = get_column_letter(idx)
+        column_letters[col_name] = col_letter
+
+    # Establecer los anchos de columna
     fixed_column_widths = {
-        'A': 10,   # Archivo
-        'B': 20,   # Nombre de la Sustancia Química
-        'C': 5,    # Idioma de la HDS
-        'D': 15,   # Nombre del Componente
-        'E': 12,   # Número CAS del Componente
-        'F': 10,   # Porcentaje del Componente
-        'G': 15,   # Componente GEI
-        'H': 8,   # Potencial de Calentamiento Global
-        'I': 12,   # Componente RETC
-        'J': 8,   # MPU
-        'K': 8,   # Emisión Transferencia
-        'L': 12,   # Palabra de Advertencia
-        'M': 25,   # Indicaciones de toxicología
-        'N': 20,   # Pictogramas
-        'O': 15,   # Estado Físico
-        'P': 30,   # Identificaciones de peligro H
-        'Q': 30,   # Consejos de Prudencia P
-        'R': 15,   # Olor
-        'S': 15,   # Color
-        'T': 8,    # pH de la sustancia
-        'U': 12,   # temperatura_ebullicion (Valor)
-        'V': 12,   # temperatura_ebullicion (Unidades)
-        'W': 12,   # punto_congelacion (Valor)
-        'X': 12,   # punto_congelacion (Unidades)
-        'Y': 12,   # densidad (Valor)
-        'Z': 12,   # densidad (Unidades)
-        'AA': 12,   # punto_inflamacion (Valor)
-        'AB': 12,  # punto_inflamacion (Unidades)
-        'AC': 12,  # velocidad_evaporacion (Valor)
-        'AD': 12,  # velocidad_evaporacion (Unidades)
-        'AE': 12,  # presion_vapor (Valor)
-        'AF': 12,  # presion_vapor (Unidades)
-        'AG': 12,  # solubilidad_agua (Valor)
-        'AH': 12,  # solubilidad_agua (Unidades)
-        'AI': 20,  # Propiedades Explosivas
-        'AJ': 20,  # Propiedades Comburentes
-        'AK': 15,  # Tamaño de Partícula
-        'AL': 12,  # Límite inferior de inflamabilidad
-        'AM': 12   # Límite superior de inflamabilidad
+        'Archivo': 10,
+        'Nombre de la Sustancia Química': 15,
+        'Idioma de la HDS': 10,
+        'Sujeta a GEI': 8,
+        'Sujeta a RETC': 8,
+        'Nombre del Componente': 15,
+        'Número CAS del Componente': 12,
+        'Porcentaje del Componente': 12,
+        'Componente GEI': 15,
+        'Potencial de Calentamiento Global': 8,
+        'Componente RETC': 15,
+        'MPU': 8,
+        'Emision Transferencia': 8,
+        'Palabra de Advertencia': 10,
+        'Indicaciones de toxicología': 20,
+        'Estado Físico': 8,
+        'Identificaciones de peligro H': 20,
+        'Consejos de Prudencia P': 20,
+        'Olor': 10,
+        'Color': 10,
+        'pH de la sustancia': 8,
+        'Propiedades Explosivas': 20,
+        'Propiedades Comburentes': 20,
+        'Tamaño de Partícula': 8,
+        'Límite inferior de inflamabilidad': 8,
+        'Límite superior de inflamabilidad': 8,
+        'Explosivos': 5,
+        'Inflamables': 5,
+        'Comburentes': 5,
+        'Gases Comprimidos': 5,
+        'Corrosivos': 5,
+        'Toxicidad Aguda': 5,
+        'Irritantes': 5,
+        'Peligro Crónico para la Salud': 5,
+        'Peligro Ambiental': 5,
+        'Valor': 10,  # Añade los anchos para las columnas de propiedades y pictogramas si es necesario
+        'Unidades': 8,
+        # Añade los anchos para las columnas de propiedades y pictogramas si es necesario
     }
 
-    for col, width in fixed_column_widths.items():
-        ws.column_dimensions[col].width = width
+    for col_name, width in fixed_column_widths.items():
+        if col_name in column_letters:
+            col_letter = column_letters[col_name]
+            ws.column_dimensions[col_letter].width = width
 
     # Ajustar la altura de las filas para que se vea todo el texto
-    for row in ws.iter_rows(min_row=2, max_col=ws.max_column, max_row=ws.max_row):
+    for row in ws.iter_rows(min_row=3, max_col=ws.max_column, max_row=ws.max_row):
         max_height = 1
         for cell in row:
             cell.alignment = Alignment(wrap_text=True, vertical='center')  # Ajuste automático del texto y centrado
@@ -537,7 +713,7 @@ def export_to_excel(data:list, output_file:str ="output.xlsx")->None:
 
     # Guardar el archivo final
     wb.save(output_file)
-    ##Eliminar el archivo temporal
+    # Eliminar el archivo temporal
     os.remove(temp_file)
 
 
@@ -574,6 +750,16 @@ def process_hds_folder(folder_path:str, project_name:str, client, excel_output:s
         retc_list = json.load(f)
         # Convertir la lista de dicts a un dict con el número CAS como clave para acceso rápido
         retc_data = {entry['numero_cas']: entry for entry in retc_list}
+    # Cargar el mapeo de pictogramas desde el archivo JSON
+    # Ruta al archivo JSON de pictogramas
+    pictogram_json_path = os.path.join(base_path, 'data_sets', 'pictograms_mapping.json')
+
+    # Cargar el JSON de pictogramas
+    with open(pictogram_json_path, 'r', encoding='utf-8') as f:
+        pictogram_data = json.load(f)
+    # Crear un diccionario que mapee el peligro al pictograma completo
+    peligro_a_pictograma = {item['peligro']: item for item in pictogram_data}
+
     with open(gei_file_path, 'r', encoding='utf-8') as f:
         gei_list = json.load(f)
         # Crear un diccionario con número CAS como clave
@@ -628,7 +814,7 @@ def process_hds_folder(folder_path:str, project_name:str, client, excel_output:s
         json.dump(all_sustancias, output_file, indent=2, ensure_ascii=False)
 
     # Generar el Excel formateado con celdas combinadas y alineadas
-    export_to_excel(sustancias_data, excel_output)
+    export_to_excel(sustancias_data,peligro_a_pictograma,excel_output)
 
     print(f"Proceso completado. Los archivos {json_output} y {excel_output} han sido generados.")
     return errores, all_sustancias
@@ -636,6 +822,6 @@ def process_hds_folder(folder_path:str, project_name:str, client, excel_output:s
 if __name__ == "__main__":
     load_dotenv()
     openai.api_key = os.getenv("OPENAI_API_KEY")
-    example_path="ejemplo/"
+    example_path="ejemplo/mini_test"
     client = openai.OpenAI()
-    process_hds_folder(example_path, "Prueba GEI y RETC",client,'ejemplo/prueba2.xlsx','ejemplo/prueba2.json')
+    process_hds_folder(example_path, "Prueba GEI y RETC",client,'ejemplo/outputs/prueba_pictogramas1.xlsx','ejemplo/outputs/prueba_pictogramas1')

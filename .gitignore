@@ -5,7 +5,6 @@ myenv/
 venv/
 env/
 .env
-*.xlsx
 config.json
 __pycache__/
 *.pyc
