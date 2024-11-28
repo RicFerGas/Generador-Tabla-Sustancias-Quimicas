@@ -73,6 +73,9 @@ class GeneradorTablaSustQ:
             self._extract_propiedades_info(hds_dict, common_info)
             self._extract_indicaciones_consejos_info(hds_dict, common_info)
             self._extract_valores_limite(hds_dict, common_info)
+            self._calculate_riesgo_tabla_5(common_info)
+            self._calculate_riesgo_tabla_6(hds_dict, common_info)
+            self._determine_volatilidad(hds_dict, common_info)
             self._extract_componentes_info(hds_dict, common_info, sustancias_flat)
             
            
@@ -81,11 +84,20 @@ class GeneradorTablaSustQ:
 
     def _extract_common_info(self, hds_dict: dict) -> dict:
         """Extract common information for all rows of the substance."""
+        estado_fisico_data = hds_dict.get('estado_fisico', {})
+        if estado_fisico_data.get('solido_baja') or estado_fisico_data.get('solido_media') or estado_fisico_data.get('solido_alta'):
+            estado_fisico = 'Sólido'
+        elif estado_fisico_data.get('liquido'):
+            estado_fisico = 'Líquido'
+        elif estado_fisico_data.get('gaseoso'):
+            estado_fisico = 'Gaseoso'
+        else:
+            estado_fisico = 'No determinado'
         return {
             'Archivo': hds_dict.get('Archivo'),
             'Nombre de la Sustancia Química': hds_dict.get('nombre_sustancia_quimica'),
             'Idioma de la HDS': hds_dict.get('idioma'),
-            'Estado Físico': hds_dict.get('estado_fisico'),
+            'Estado Físico': estado_fisico,
             'Sujeta a RETC': hds_dict.get('sujeta_retc'),
             'Sujeta a GEI': hds_dict.get('sujeta_gei'),
             'pH de la sustancia': hds_dict.get('ph'),
@@ -233,38 +245,27 @@ class GeneradorTablaSustQ:
                         break
         return gei_entry
     def _extract_valores_limite(self, hds_dict: dict, common_info: dict) -> None:
-        """Extract exposure limits into separate columns with formatted values."""
-        common_info['Valores Limite de Exposicion Oral'] = None
-        common_info['Valores Limite de Exposicion Inhalacion'] = None
-        common_info['Valores Limite de Exposicion Cutanea'] = None
-        
-        # Early return if no valores_limite
+        """Extract exposure limits into separate columns with numeric values and units."""
+        routes = ['oral', 'inhalacion', 'cutanea']
+        for route in routes:
+            common_info[f'Valores Limite de Exposicion {route.capitalize()} Valor'] = None
+            common_info[f'Valores Limite de Exposicion {route.capitalize()} Unidades'] = None
+
         valores_limite = hds_dict.get('valoreslimite')
         if not valores_limite:
             return
-        
-        # Format for each exposure type
-        def format_valor_limite(valor_dict: dict) -> str:
-            if not valor_dict:
-                return None
-            valor = valor_dict.get('valor')
-            unidades = valor_dict.get('unidades')
-            if valor is None or unidades is None:
-                return None
-            print(f"DEBUG Valor: {valor}, Unidades: {unidades}")
-            return f"{valor} {unidades}"
-        
-        # Safely get and format each exposure type
-        if isinstance(valores_limite, dict):
-            common_info['Valores Limite de Exposicion Oral'] = format_valor_limite(
-                valores_limite.get('oral')
-            )
-            common_info['Valores Limite de Exposicion Inhalacion'] = format_valor_limite(
-                valores_limite.get('inhalacion')
-            )
-            common_info['Valores Limite de Exposicion Cutanea'] = format_valor_limite(
-                valores_limite.get('cutanea')
-            )
+
+        for route in routes:
+            valor_dict = valores_limite.get(route)
+            if valor_dict:
+                valor = valor_dict.get('valor')
+                unidades = valor_dict.get('unidades')
+                try:
+                    valor = float(valor)
+                except (TypeError, ValueError):
+                    valor = None
+                common_info[f'Valores Limite de Exposicion {route.capitalize()} Valor'] = valor
+                common_info[f'Valores Limite de Exposicion {route.capitalize()} Unidades'] = unidades
 
     def _merge_cells_by_substance(self, ws, df):
         """Merges cells for columns where the substance is the same."""
@@ -346,7 +347,7 @@ class GeneradorTablaSustQ:
             # Get pictogram image details from the mapping
             pictogram_info = self.peligro_a_pictograma.get(hazard_name)
             if pictogram_info and 'ruta_imagen' in pictogram_info:
-                image_path = os.path.abspath(pictogram_info['ruta_imagen'])
+                image_path = self.config_path / pictogram_info['ruta_imagen']
 
                 if os.path.exists(image_path):
                     img = Image(image_path)
@@ -364,6 +365,190 @@ class GeneradorTablaSustQ:
                     print(f"No se encontró la imagen para {hazard_name} en {image_path}")
             else:
                 print(f"No hay información de pictograma para el peligro: {hazard_name}")
+    def _calculate_riesgo_tabla_5(self, common_info: dict) -> None:
+        """Calculate 'Grado de Riesgo a la Salud' according to Tabla 5 and add to common_info."""
+        grado_oral = None
+        grado_cutanea = None
+        grado_inhalacion = None
+
+        # Get exposure limit values and units
+        oral_val = common_info.get('Valores Limite de Exposicion Oral Valor')
+        oral_unit = common_info.get('Valores Limite de Exposicion Oral Unidades')
+
+        cutanea_val = common_info.get('Valores Limite de Exposicion Cutanea Valor')
+        cutanea_unit = common_info.get('Valores Limite de Exposicion Cutanea Unidades')
+
+        inhalacion_val = common_info.get('Valores Limite de Exposicion Inhalacion Valor')
+        inhalacion_unit = common_info.get('Valores Limite de Exposicion Inhalacion Unidades')
+
+        # Evaluate grado for oral
+        if oral_val is not None and oral_unit == 'mg/kg':
+            val = oral_val
+            if val <= 1:
+                grado_oral = 4
+            elif val <= 20:
+                grado_oral = 3
+            elif val <= 50:
+                grado_oral = 2
+            elif val <= 500:
+                grado_oral = 1
+            elif val > 5000:
+                grado_oral = 0
+
+        # Evaluate grado for cutánea
+        if cutanea_val is not None and cutanea_unit == 'mg/kg':
+            val = cutanea_val
+            if val <= 20:
+                grado_cutanea = 4
+            elif val <= 200:
+                grado_cutanea = 3
+            elif val <= 1000:
+                grado_cutanea = 2
+            elif val <= 5000:
+                grado_cutanea = 1
+            elif val > 5000:
+                grado_cutanea = 0
+
+        # Evaluate grado for inhalación
+        if inhalacion_val is not None:
+            val = inhalacion_val
+            if inhalacion_unit == 'mg/l':
+                if val <= 0.2:
+                    grado_inhalacion = 4
+                elif val <= 2:
+                    grado_inhalacion = 3
+                elif val <= 20:
+                    grado_inhalacion = 2
+                elif val <= 200:
+                    grado_inhalacion = 1
+                elif val > 200:
+                    grado_inhalacion = 0
+            elif inhalacion_unit == 'ppm':
+                if val <= 20:
+                    grado_inhalacion = 4
+                elif val <= 200:
+                    grado_inhalacion = 3
+                elif val <= 1000:
+                    grado_inhalacion = 2
+                elif val <= 10000:
+                    grado_inhalacion = 1
+                elif val > 10000:
+                    grado_inhalacion = 0
+            elif inhalacion_unit == 'mg/m³':
+                if val <= 200:
+                    grado_inhalacion = 4
+                elif val <= 2000:
+                    grado_inhalacion = 3
+                elif val <= 20000:
+                    grado_inhalacion = 2
+                elif val <= 200000:
+                    grado_inhalacion = 1
+                elif val > 200000:
+                    grado_inhalacion = 0
+
+        # Determine the maximum grado
+        grados = [grado for grado in [grado_oral, grado_cutanea, grado_inhalacion] if grado is not None]
+        if grados:
+            grado_max = max(grados)
+        else:
+            grado_max = None
+
+        grado_desc = {
+            0: 'Grado 0, Mínimamente peligroso',
+            1: 'Grado 1, Ligeramente peligroso',
+            2: 'Grado 2, Moderadamente peligroso',
+            3: 'Grado 3, Seriamente peligroso',
+            4: 'Grado 4, Severamente peligroso',
+        }
+
+        grado_text = grado_desc.get(grado_max, 'No determinado')
+
+        # Add the result to common_info
+        common_info['NOM-010-STPS Riesgo Tabla 5'] = grado_text
+
+    def _calculate_riesgo_tabla_6(self, hds_dict: dict, common_info: dict) -> None:
+        """Calculate 'Categoría de Peligro para la Salud' according to Tabla 6 and add to common_info."""
+        h_codes = [h['codigo'] for h in hds_dict.get('identificaciones_peligro_h', [])]
+        h_codes_set = set(h_codes)
+        
+        categories = [
+            (1, ['H304', 'H330', 'H334', 'H340', 'H350', 'H360', 'H370', 'H372',
+                ('H300', 'H330'), ('H310', 'H330'), ('H300', 'H310', 'H330')]),
+            (2, ['H305', 'H341', 'H351', 'H361', 'H371', 'H373']),
+            (3, ['H331', 'H335', 'H336',
+                ('H301', 'H331'), ('H311', 'H331'), ('H301', 'H311', 'H331')]),
+            (4, ['H332',
+                ('H302', 'H332'), ('H312', 'H332'), ('H302', 'H312', 'H332')]),
+            (5, ['H333',
+                ('H303', 'H333'), ('H313', 'H333'), ('H303', 'H313', 'H333')]),
+        ]
+        
+        applicable_categories = []
+
+        # Collect all applicable categories and their corresponding H codes
+        for category, h_codes_list in categories:
+            for h_code_item in h_codes_list:
+                if isinstance(h_code_item, str):
+                    if h_code_item in h_codes_set:
+                        applicable_categories.append((category, [h_code_item]))
+                elif isinstance(h_code_item, tuple):
+                    if all(h in h_codes_set for h in h_code_item):
+                        applicable_categories.append((category, list(h_code_item)))
+
+        if applicable_categories:
+            # Select the lowest risk category (highest category number)
+            lowest_risk_category = max(applicable_categories, key=lambda x: x[0])
+            category_number = lowest_risk_category[0]
+            # Collect all H codes corresponding to the lowest risk category
+            h_codes_matched = set()
+            for cat, codes in applicable_categories:
+                if cat == category_number:
+                    h_codes_matched.update(codes)
+            h_codes_str = ', '.join(sorted(h_codes_matched))
+            common_info['NOM-010-STPS Peligro Tabla 6'] = f'Categoría {category_number}, por Peligros H: {h_codes_str}'
+        else:
+            common_info['NOM-010-STPS Peligro Tabla 6'] = 'No determinado'
+    def _determine_volatilidad(self, hds_dict: dict, common_info: dict) -> None:
+        """Determine the volatility of the substance and add to common_info."""
+        estado_fisico = common_info.get('Estado Físico', '').lower()
+        boiling_point = common_info.get('temperatura_ebullicion (Valor)')
+        if boiling_point:
+            try:
+                boiling_point = float(boiling_point)
+            except ValueError:
+                boiling_point = None
+
+        # Assume operating temperature is 20°C if not provided
+        operating_temp = 40  # You may update this if you have actual data
+
+        volatility = 'No determinado'  # Default value
+
+        if estado_fisico == 'gaseoso':
+            volatility = 'Alta'
+        elif estado_fisico == 'líquido':
+            # Apply Tabla 8 logic
+            if boiling_point is not None:
+                if boiling_point < 50 and 20 <= operating_temp <= 310:
+                    volatility = 'Alta'
+                elif 50 <= boiling_point <= 150 and 20 <= operating_temp <= 55:
+                    volatility = 'Media'
+                elif boiling_point > 150 and 20 <= operating_temp <= 55:
+                    volatility = 'Baja'
+            else:
+                volatility = 'Temperatura de ebullicion no disponible'
+        elif estado_fisico == 'sólido':
+            # Apply Tabla 7 logic
+            estado_fisico_data = hds_dict.get('estado_fisico', {})
+            if estado_fisico_data.get('solido_baja'):
+                volatility = 'Baja'
+            elif estado_fisico_data.get('solido_media'):
+                volatility = 'Media'
+            elif estado_fisico_data.get('solido_alta'):
+                volatility = 'Alta'
+            else:
+                volatility = 'No determinado'
+
+        common_info['NOM-010-STPS Volatilidad Tabla 7 y 8'] = volatility 
 
     def _customize_worksheet(self, ws, df):
         """Handles custom formatting of the worksheet."""
@@ -526,9 +711,15 @@ class GeneradorTablaSustQ:
                 'Tamaño de Partícula',              # 47. Particle size
                 'Límite inferior de inflamabilidad',# 48. Lower flammability limit
                 'Límite superior de inflamabilidad', # 49. Upper flammability limit
-                'Valores Limite de Exposicion Oral', # 50. Exposure limit values
-                'Valores Limite de Exposicion Cutanea', # 51. Exposure limit values
-                'Valores Limite de Exposicion Inhalacion', # 52. Exposure limit values
+                'Valores Limite de Exposicion Oral Valor', # 50. Exposure limit values
+                'Valores Limite de Exposicion Oral Unidades', # 50. Exposure limit values
+                'Valores Limite de Exposicion Inhalacion Valor', # 52. Exposure limit values
+                'Valores Limite de Exposicion Inhalacion Unidades', # 52. Exposure limit values
+                'Valores Limite de Exposicion Cutanea Valor', # 51. Exposure limit values
+                'Valores Limite de Exposicion Cutanea Unidades', # 51. Exposure limit values
+                'NOM-010-STPS Riesgo Tabla 5',
+                'NOM-010-STPS Peligro Tabla 6',
+                'NOM-010-STPS Volatilidad Tabla 7 y 8'  
             ]
             df = df[column_order]  # Ensure columns are in the desired order
 
@@ -540,7 +731,7 @@ class GeneradorTablaSustQ:
 
             # Get headers from the template
             template_headers = self.get_template_headers(ws)
-            print(f"Template headers: {template_headers}")
+            # print(f"Template headers: {template_headers}")
 
             # Create a mapping from DataFrame columns to template columns
             column_mapping = {}
@@ -550,12 +741,12 @@ class GeneradorTablaSustQ:
                     df_col_norm = self.normalize_str(df_col)
                     if df_col_norm == header_norm:
                         column_mapping[df_col] = idx + 1  # Excel columns are 1-indexed
-                        print(f"Mapping DataFrame column '{df_col}' to template header '{header}'")
+                        # print(f"Mapping DataFrame column '{df_col}' to template header '{header}'")
                         break
                 else:
                     print(f"Header '{header}' in template not found in DataFrame columns.")
 
-            print(f"Column mapping: {column_mapping}")
+            # print(f"Column mapping: {column_mapping}")
 
             # Start populating data from row 3
             start_row = 3
@@ -583,11 +774,11 @@ class GeneradorTablaSustQ:
             print(f"An error occurred: {e}")
             raise e
 if __name__ == "__main__":
-    import json
-    from datetime import datetime
+    # import json 
+    # from datetime import datetime
     #Test the class
     generator=  GeneradorTablaSustQ()
-    with open("ejemplo/outputs/ejemplo_gral_run_raw_data.json", "r", encoding="utf-8") as f:
+    with open("ejemplo/outputs/ejemplo_gral_run_NOM10_raw_data.json", "r", encoding="utf-8") as f:
         hds_data = json.load(f)
     example_flat = generator.flatten_hds_data(hds_data)
     # print(f"Flattened data: {example_flat}")

@@ -118,6 +118,7 @@ class WorkerThread(QThread):
             _,_= processor.process_folder(
                 self.input_dir,
                 self.project_name,
+                self.output_dir,
                 progress_callback)
 
             self.finished.emit(True)

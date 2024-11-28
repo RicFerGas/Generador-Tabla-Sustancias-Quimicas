@@ -15,6 +15,22 @@ class indicaciones(BaseModel):
     descripcion: str = Field(..., 
                              alias='Descripción', 
                              description='Indicación de peligro o palabra de advertencia')
+class EstadoFisico(BaseModel):
+    solido_baja: bool = Field(..., alias='Sólido de media volatilidad',
+                               description="""Sustancias sólidas cristalinas o granulares. 
+                               Cuando son usadas, se observa producción de polvo que se disipa o deposita rápidamente sobre superficies después del uso. 
+                               p.ej. jabón en polvo, entre otros.""")
+    solido_baja: bool = Field(..., alias='Sólido de baja volatilidad',
+                                 description="""Sustancias en forma de pellets que no tienen tendencia a romperse.
+                                   No se aprecia producción de polvo durante su empleo. 
+                                   p.ej. pellets de cloruro de polivinilo, escamas enceradas, entre otras.""")
+    solido_alta: bool = Field(..., alias='Sólido de alta volatilidad',
+                                description="""Polvos finos, ligeros y de baja densidad. Cuando son usados, se
+                                producen nubes de polvo que permanecen en el aire durante varios
+                                minutos. p.ej. cemento, negro de humo, polvo de tiza, entre otros.""")
+    liquido: bool = Field(..., alias='Líquido', description='Indica si la sustancia química es líquida')
+    gaseoso: bool = Field(..., alias='Gaseoso', description='Indica si la sustancia química es gaseosa')
+
 class componente(BaseModel):
     nombre: str = Field(..., 
                         alias='Nombre',
@@ -120,7 +136,7 @@ class HDSData(BaseModel):
                                       alias='Sujeta a GEI',
                                       description='Elige una de las 3 opciones [NO, SI, REVISAR] Indica si la sustancia química está sujeta o podria estar sujeta a reporte de  Gases de Efecto Invernadero de conformidad con ACUERDO:Qué establece los gases o compuestos de efecto invernadero que se agrupan para efectos de reporte de emisiones, así como sus potenciales de calentamiento en Mexico por la semarnat')
     valoreslimite: Optional[ValoresLimiteExposicion] = Field(..., alias='Valores límite de exposición', description='Valores límite de exposición de la sustancia química, se encuentran en la Sección 8 y 11 de la HDS')
-    estado_fisico: Optional[str] = Field(None, alias='Estado Físico', description='Estado físico de la sustancia química en Español, se encuentra en la Sección 9 de la HDS')
+    estado_fisico: Optional[EstadoFisico] = Field(..., alias='Estado Físico', description='Estado físico de la sustancia química en Español, se encuentra en la Sección 9 de la HDS')
     olor: Optional[str] = Field(None, alias='Olor', description='Olor de la sustancia química en Español, se encuentra en la Sección 9 de la HDS')
     color: Optional[str] = Field(None, alias='Color', description='Color de la sustancia química en Español, se encuentra en la Sección 9 de la HDS')
     velocidad_evaporacion: Optional[Propiedad] = Field(None, alias='Velocidad de evaporación', description='Velocidad de evaporación de la sustancia química, se encuentra en la Sección 9 de la HDS')

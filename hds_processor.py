@@ -13,7 +13,7 @@ class HDSProcessor:
     Process multiple HDS documents from a folder, generate structured data,
     and export to Excel and JSON formats.
     """
-    def __init__(self, client, config_path: str = "data_sets"):
+    def __init__(self, client, config_path: str = "data_sets",output_path: str = "outputs"):
         self.client = client
         if getattr(sys, 'frozen', False):
             # Running as exe
@@ -31,6 +31,7 @@ class HDSProcessor:
     def process_folder(self,
                       folder_path: str,
                       project_name: str,
+                    output_path: Optional[str] = None,
                       progress_callback: Optional[Callable] = None) -> Tuple[List[str], List[dict]]:
         """
         Process all supported documents in a folder.
@@ -46,9 +47,10 @@ class HDSProcessor:
             Tuple containing list of errors and list of processed data
         """
         # Output paths
-        json_output = f"{project_name}_raw_data.json"
-        excel_output = f"{project_name}_Tabla_de_HDSs.xlsx"
         folder = Path(folder_path)
+        json_output = os.path.join(output_path,f"{project_name}_raw_data.json")
+        excel_output = os.path.join(output_path,f"{project_name}_Tabla_de_HDSs.xlsx")
+        
         all_data = []
         errors = []
         
@@ -115,7 +117,7 @@ if __name__ == "__main__":
     hds_processor = HDSProcessor(client)
     errors, all_data = hds_processor.process_folder(
         "ejemplo",
-        "ejemplo/outputs/ejemplo_gral_run")
+        "ejemplo/outputs/ejemplo_gral_run_NOM10")
     
     print(f"Errors: {errors}")
     print(f"Processed data: {len(all_data)}")
