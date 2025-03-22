@@ -48,7 +48,8 @@ class DocumentPreprocessor:
         Returns:
             bool: True if the file is supported, False otherwise.
         """
-        return any(self.file_path.lower().endswith(ext) for ext in self.supported_extensions)
+        file_path = str(self.file_path)
+        return any(file_path.lower().endswith(ext) for ext in self.supported_extensions)
 
     def is_valid_pdf(self) -> bool:
         """
@@ -178,7 +179,7 @@ class DocumentPreprocessor:
         """
         Main method to extract text from any supported document.
         """
-        self.file_path=document_path
+        self.file_path=str(document_path)
         if not self.is_supported_file():
             return "Unsupported file format"
 

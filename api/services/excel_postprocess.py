@@ -77,6 +77,7 @@ class GeneradorTablaSustQ:
             self._calculate_riesgo_tabla_6(hds_dict, common_info)
             self._determine_volatilidad(hds_dict, common_info)
             self._extract_componentes_info(hds_dict, common_info, sustancias_flat)
+
             
            
 
@@ -85,14 +86,18 @@ class GeneradorTablaSustQ:
     def _extract_common_info(self, hds_dict: dict) -> dict:
         """Extract common information for all rows of the substance."""
         estado_fisico_data = hds_dict.get('estado_fisico', {})
-        if estado_fisico_data.get('solido_baja') or estado_fisico_data.get('solido_media') or estado_fisico_data.get('solido_alta'):
-            estado_fisico = 'Sólido'
-        elif estado_fisico_data.get('liquido'):
-            estado_fisico = 'Líquido'
-        elif estado_fisico_data.get('gaseoso'):
-            estado_fisico = 'Gaseoso'
+        if isinstance(estado_fisico_data, dict):
+            if estado_fisico_data.get('solido_baja') or estado_fisico_data.get('solido_media') or estado_fisico_data.get('solido_alta'):
+                estado_fisico = 'Sólido'
+            elif estado_fisico_data.get('liquido'):
+                estado_fisico = 'Líquido'
+            elif estado_fisico_data.get('gaseoso'):
+                estado_fisico = 'Gaseoso'
+            else:
+                estado_fisico = 'No determinado'
         else:
             estado_fisico = 'No determinado'
+        
         return {
             'Archivo': hds_dict.get('Archivo'),
             'Nombre de la Sustancia Química': hds_dict.get('nombre_sustancia_quimica'),
@@ -189,8 +194,10 @@ class GeneradorTablaSustQ:
 
                 gei_entry = self._find_gei_entry(cas_number, nombre_componente)
                 if gei_entry:
+                    pcg=gei_entry.get('PCG')
                     row['Componente GEI'] = gei_entry.get('nombre_comun')
-                    row['Potencial de Calentamiento Global'] = gei_entry.get('PCG')
+                    row['Potencial de Calentamiento Global'] = pcg
+                    row['Factor de Emisión']= pcg*row['Porcentaje del Componente']/100
                 else:
                     row['Componente GEI'] = None
                     row['Potencial de Calentamiento Global'] = None
@@ -549,6 +556,12 @@ class GeneradorTablaSustQ:
                 volatility = 'No determinado'
 
         common_info['NOM-010-STPS Volatilidad Tabla 7 y 8'] = volatility 
+    
+    def _factor_gei_substance(self, hds_dict: dict, common_info: dict):
+        """Calculate the GEI factor for the substance."""
+        
+
+        pass
 
     def _customize_worksheet(self, ws, df):
         """Handles custom formatting of the worksheet."""
@@ -778,7 +791,7 @@ if __name__ == "__main__":
     # from datetime import datetime
     #Test the class
     generator=  GeneradorTablaSustQ()
-    with open("ejemplo/outputs/ejemplo_gral_run_NOM10_raw_data.json", "r", encoding="utf-8") as f:
+    with open("tabla_raw_data.json", "r", encoding="utf-8") as f:
         hds_data = json.load(f)
     example_flat = generator.flatten_hds_data(hds_data)
     # print(f"Flattened data: {example_flat}")

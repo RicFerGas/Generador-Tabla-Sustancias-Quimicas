@@ -53,7 +53,7 @@ def extract_info_from_hds_txt(hds_text: str,client:Any) -> HDSData:
 if __name__ == "__main__":
     import os
     from dotenv import load_dotenv
-    from preprocess import DocumentPreprocessor
+    from api.services.preprocess import DocumentPreprocessor
     load_dotenv()
     openai.api_key = os.getenv("OPENAI_API_KEY")
     CLIENT = openai.OpenAI()

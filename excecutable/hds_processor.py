@@ -4,9 +4,9 @@ import os
 import sys
 import json
 from typing import Callable, List, Tuple, Optional
-from preprocess import DocumentPreprocessor
-from extract_info import extract_info_from_hds_txt
-from excel_postprocess import GeneradorTablaSustQ
+from api.services.preprocess import DocumentPreprocessor
+from api.services.extract_info import extract_info_from_hds_txt
+from api.services.excel_postprocess import GeneradorTablaSustQ
 
 class HDSProcessor:
     """

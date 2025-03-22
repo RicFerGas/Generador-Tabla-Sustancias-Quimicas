@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QMovie
 from PyQt5.QtCore import  Qt,QThread, pyqtSignal
 import openai
-from hds_processor import HDSProcessor
+from excecutable.hds_processor import HDSProcessor
 
 
 

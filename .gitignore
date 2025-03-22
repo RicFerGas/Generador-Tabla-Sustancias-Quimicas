@@ -16,3 +16,4 @@ dist/
 build/
 ejemplo/outputs/
 models/xx_ent_wiki_sm/*
+*.json
