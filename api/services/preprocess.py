@@ -29,7 +29,8 @@ class DocumentPreprocessor:
             if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
                 base_path = sys._MEIPASS
             else:
-                base_path = os.path.dirname(os.path.abspath(__file__))
+                # Get the project root directory (up 2 levels from api/services)
+                base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
             self.supported_extensions = ['.pdf', '.docx', '.doc']
             model_relative_path = os.path.join('models',
                                             'xx_ent_wiki_sm',
